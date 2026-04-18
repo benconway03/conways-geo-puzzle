@@ -53,11 +53,16 @@ def home():
         session['guess_count'] = 0
         session['has_won'] = False
         session['submitted_score'] = False
+        session['grid'] = []     # <-- NEW: Create a blank emoji list
+        session['time_str'] = "" # <-- NEW: Create a blank time string
 
     return render_template("index.html", 
                            has_won=session.get('has_won', False), 
                            submitted=session.get('submitted_score', False),
-                           guesses=session.get('guess_count', 0))
+                           guesses=session.get('guess_count', 0),
+                           share_grid="".join(session.get('grid', [])), # <-- NEW
+                           time_str=session.get('time_str', ""))        # <-- NEW
+
 
 @app.route("/guess", methods=["POST"])
 def process_guess():
@@ -86,6 +91,7 @@ def process_guess():
     session['guess_count'] += 1
     
     if final_guess == target:
+        session['grid'].append("🟩") # NEW: Add a green square!
         # 1. Calculate the raw time
         raw_time = time.time() - session['start_time']
         
@@ -101,11 +107,16 @@ def process_guess():
         mins, secs = int(total_time // 60), total_time % 60
         time_str = f"{mins}m {secs:.1f}s" if mins > 0 else f"{secs:.1f}s"
         
+        session['time_str'] = time_str # NEW: Save the final time string!
+
         return jsonify({
             "status": "win", 
-            "message": f"🎉 You Won! {final_guess} is correct! Took {session['guess_count']} guesses in {time_str} (includes +{penalty_seconds}s penalty)."
+            "message": f"🎉 You Won! {final_guess} is correct! Took {session['guess_count']} guesses in {time_str} (includes +{penalty_seconds}s penalty).",
+            "grid": "".join(session['grid']), # NEW: Send the grid to the browser
+            "time_str": time_str              # NEW: Send the time to the browser
         })
     else:
+        session['grid'].append("🟥") # NEW: Add a red square for a wrong guess!
         dist, bearing = game_engine.country_dist(target, final_guess)
         return jsonify({
             "status": "continue", 

@@ -32,7 +32,9 @@
         // Read the locked status directly from Python when the page loads!
         let hasWon = {{ 'true' if has_won else 'false' }};
         let hasSubmitted = {{ 'true' if submitted else 'false' }};
-        let currentGuesses = {{ guesses }}; // Read the guess count!
+        let currentGuesses = {{ guesses }}; 
+        let shareGrid = "{{ share_grid }}"; // NEW
+        let shareTime = "{{ time_str }}";   // NEW
 
         // If they already won but haven't submitted, hide the form
         if (hasWon && !hasSubmitted) {
@@ -65,7 +67,8 @@
             
             if (data.status === "win") {
                 hasWon = true;
-                // Hide the form instead of disabling it
+                shareGrid = data.grid;      // NEW: Update the local grid
+                shareTime = data.time_str;  // NEW: Update the local time
                 document.getElementById("guessForm").style.display = "none";
                 showLeaderboardEntry();
             }
@@ -83,15 +86,36 @@
         }
 
         // NEW: This builds the final victory screen
-        function showFinalScreen() {
+function showFinalScreen() {
             document.getElementById("results").innerHTML = `
                 <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #166534;">
                     <h3 style="margin: 0;">🎉 You found today's country in ${currentGuesses} guesses!</h3>
-                    <p style="margin: 5px 0 0 0; font-size: 0.9em;">Come back tomorrow for a new puzzle.</p>
+                    <p style="margin: 5px 0 15px 0; font-size: 0.9em;">Come back tomorrow for a new puzzle.</p>
+                    
+                    <button onclick="copyShareText()" id="shareBtn" style="background-color: #22c55e; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-weight: bold;">
+                        🔗 Share Result
+                    </button>
                 </div>
                 <div id="leaderboard-table"></div>
             `;
             loadLeaderboard();
+        }
+
+        // NEW: The Clipboard logic!
+        function copyShareText() {
+            // Build the text block
+            let text = `🌍 GeoPuzzle\nGuesses: ${currentGuesses} | Time: ${shareTime}\n${shareGrid}\nPlay at: https://conways-geo-puzzle.onrender.com`;
+            
+            // Ask the browser to copy it
+            navigator.clipboard.writeText(text).then(() => {
+                let btn = document.getElementById("shareBtn");
+                btn.innerText = "✅ Copied!";
+                setTimeout(() => { btn.innerText = "🔗 Share Result"; }, 2000); // Reset button text after 2s
+            }).catch(err => {
+                console.error("Failed to copy:", err);
+                // Fallback just in case they are on an old browser
+                alert("Clipboard access denied. Copy your text below:\n\n" + text); 
+            });
         }
 
         async function submitScore() {
