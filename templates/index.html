@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoGame Web</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="game-container">
+        <h1>🌍 Welcome to Conway's Geo Puzzle!</h1>
+        <p>Guess the hidden country based on distance and direction hints.</p>
+        
+        <form id="guessForm">
+            <input type="text" id="guessInput" name="guess" placeholder="Enter a country..." autocomplete="off" required>
+            <button type="submit">Guess</button>
+        </form>
+
+        <div id="results">
+            </div>
+    </div>
+
+    <script>
+        // This JavaScript stops the page from reloading and talks to app.py
+        document.getElementById("guessForm").addEventListener("submit", async function(e) {
+            e.preventDefault(); 
+            
+            let inputField = document.getElementById("guessInput");
+            let formData = new FormData(this);
+
+            let response = await fetch("/guess", {
+                method: "POST",
+                body: formData
+            });
+            
+            let data = await response.json();
+            
+            // Add the new hint to the top of the results list
+            let resultsDiv = document.getElementById("results");
+            let newHint = document.createElement("p");
+            newHint.innerHTML = data.message;
+            resultsDiv.prepend(newHint);
+
+            inputField.value = ""; // Clear the box for the next guess
+            
+            if (data.status === "win") {
+                inputField.disabled = true; // Stop them from guessing after they win
+            }
+        });
+    </script>
+</body>
+</html>

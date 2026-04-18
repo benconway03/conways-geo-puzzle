@@ -73,7 +73,7 @@ class GeoGame:
 
         bearing = self.get_direction(target_lat2, target_lon2, target_lat1, target_lon1)
 
-        return f'{round(dist, 2)}km', bearing
+        return f'{dist:,.2f}km', bearing
 
     def __init__(self):
         self.df_countries = pd.read_csv('countries.csv')
