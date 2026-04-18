@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, session, jsonify
+from flask import Flask, render_template, request, session, jsonify, redirect, url_for
 from geogame import GeoGame  # Imports your exact class from your other file!
 import difflib
 import time
@@ -30,10 +30,9 @@ valid_countries = game_engine.df_countries['COUNTRY'].tolist()
 
 @app.route("/")
 def home():
-    session.permanent = True # Tell the browser to save this cookie
+    session.permanent = True 
     today = str(datetime.datetime.now(datetime.timezone.utc).date())
 
-    # Only reset the game if they haven't played today!
     if session.get('date') != today:
         session['date'] = today
         session['target'] = game_engine.get_daily_country()
@@ -42,10 +41,10 @@ def home():
         session['has_won'] = False
         session['submitted_score'] = False
 
-    # Pass their current status directly to the webpage when it loads
     return render_template("index.html", 
                            has_won=session.get('has_won', False), 
-                           submitted=session.get('submitted_score', False))
+                           submitted=session.get('submitted_score', False),
+                           guesses=session.get('guess_count', 0)) # <-- NEW LINE
 
 @app.route("/guess", methods=["POST"])
 def process_guess():
@@ -132,6 +131,12 @@ def save_score():
     except Exception as e:
         print(f"Database Error: {e}")
         return jsonify({"status": "error"}), 500
+
+@app.route("/dev-reset")
+def dev_reset():
+    # This wipes your session cookies and redirects you back to the home page!
+    session.clear()
+    return redirect(url_for('home'))
 
 if __name__ == "__main__":
     app.run(debug=True)

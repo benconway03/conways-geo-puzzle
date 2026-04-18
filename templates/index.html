@@ -27,26 +27,29 @@
         </div>
     </div>
 
-    <script>
+<script>
         // Read the locked status directly from Python when the page loads!
         let hasWon = {{ 'true' if has_won else 'false' }};
         let hasSubmitted = {{ 'true' if submitted else 'false' }};
+        let currentGuesses = {{ guesses }}; // Read the guess count!
 
-        // If they already won, disable the typing box immediately
-        if (hasWon) {
-            let inputField = document.getElementById("guessInput");
-            inputField.disabled = true;
-            inputField.placeholder = "Come back tomorrow!";
+        // If they already won but haven't submitted, hide the form
+        if (hasWon && !hasSubmitted) {
+            document.getElementById("guessForm").style.display = "none";
         }
 
-        // If they already submitted their score, show the leaderboard immediately
+        // If they already submitted their score, show their personal result and the leaderboard
         if (hasSubmitted) {
-            loadLeaderboard();
+            document.getElementById("guessForm").style.display = "none";
+            showFinalScreen();
         }
 
         document.getElementById("guessForm").addEventListener("submit", async function(e) {
             e.preventDefault(); 
-            if (hasWon) return; // Extra check to stop guessing after win
+            if (hasWon) return; 
+
+            // Add to the guess counter locally
+            currentGuesses++;
 
             let formData = new FormData(this);
             let response = await fetch("/guess", { method: "POST", body: formData });
@@ -54,20 +57,15 @@
             
             let resultsDiv = document.getElementById("results");
             let newHint = document.createElement("p");
-            
-            // SECURITY FIX 1: Use innerText instead of innerHTML so if a user 
-            // types an HTML tag as their guess, it doesn't break the page.
             newHint.innerText = data.message; 
-            
             resultsDiv.prepend(newHint);
 
             document.getElementById("guessInput").value = "";
             
             if (data.status === "win") {
                 hasWon = true;
-                let inputField = document.getElementById("guessInput");
-                inputField.disabled = true;
-                inputField.placeholder = "Come back tomorrow!";
+                // Hide the form instead of disabling it
+                document.getElementById("guessForm").style.display = "none";
                 showLeaderboardEntry();
             }
         });
@@ -83,9 +81,21 @@
             ` + resultsDiv.innerHTML;
         }
 
+        // NEW: This builds the final victory screen
+        function showFinalScreen() {
+            document.getElementById("results").innerHTML = `
+                <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #166534;">
+                    <h3 style="margin: 0;">🎉 You found today's country in ${currentGuesses} guesses!</h3>
+                    <p style="margin: 5px 0 0 0; font-size: 0.9em;">Come back tomorrow for a new puzzle.</p>
+                </div>
+                <div id="leaderboard-table"></div>
+            `;
+            loadLeaderboard();
+        }
+
         async function submitScore() {
             let name = document.getElementById("playerName").value;
-            if (!name) return; // Prevent empty names
+            if (!name) return; 
 
             let formData = new FormData();
             formData.append("name", name);
@@ -96,22 +106,23 @@
 
             try {
                 let response = await fetch("/save_score", { method: "POST", body: formData });
+                let result = await response.json(); 
                 
-                if (response.ok) {
+                if (response.ok && result.status === "success") {
                     hasSubmitted = true;
-                    loadLeaderboard();
+                    showFinalScreen(); // Switch to the final victory screen!
                 } else {
-                    alert("Server Error: Could not save score.");
+                    alert("Server Error: " + (result.message || "Could not save score."));
                     btn.innerText = "Error";
                 }
             } catch (err) {
+                console.error("Fetch Error:", err);
                 alert("Network Error: Could not reach the server.");
                 btn.innerText = "Submit";
                 btn.disabled = false;
             }
         }
 
-        // SECURITY FIX 2: A quick helper function to strip malicious code out of names
         function escapeHTML(str) {
             let div = document.createElement('div');
             div.innerText = str;
@@ -119,17 +130,24 @@
         }
 
         async function loadLeaderboard() {
-            let response = await fetch("/get_leaderboard");
-            let scores = await response.json();
-            
-            let html = "<h3>Today's Top 10</h3><table style='width:100%'><tr><th>Name</th><th>Guesses</th><th>Time</th></tr>";
-            scores.forEach(s => {
-                // We wrap s.name in our new escapeHTML function here!
-                html += `<tr><td>${escapeHTML(s.name)}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
-            });
-            html += "</table>";
-            
-            document.getElementById("results").innerHTML = html;
+            try {
+                let response = await fetch("/get_leaderboard");
+                let scores = await response.json();
+                
+                let html = "<h3 style='margin-top:0;'>Today's Top 10</h3><table style='width:100%; text-align:left;'><tr><th>Name</th><th>Guesses</th><th>Time</th></tr>";
+                scores.forEach(s => {
+                    html += `<tr><td>${escapeHTML(s.name)}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
+                });
+                html += "</table>";
+                
+                // Inject into the new leaderboard-table div we created in showFinalScreen()
+                let targetDiv = document.getElementById("leaderboard-table") || document.getElementById("results");
+                targetDiv.innerHTML = html;
+            } catch(err) {
+                console.error("Leaderboard Error:", err);
+                let targetDiv = document.getElementById("leaderboard-table") || document.getElementById("results");
+                targetDiv.innerHTML = "<p style='color:red;'>⚠️ Error loading leaderboard.</p>";
+            }
         }
     </script>
 </body>
