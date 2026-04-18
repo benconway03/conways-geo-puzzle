@@ -91,6 +91,9 @@ def process_guess():
 
     session['guess_count'] += 1
     
+    if 'grid' not in session:
+        session['grid'] = []
+
     if final_guess == target:
         session['grid'].append("🟩") # NEW: Add a green square!
         # 1. Calculate the raw time
