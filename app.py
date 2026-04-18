@@ -75,7 +75,7 @@ def process_guess():
     user_guess = request.form.get("guess").strip().title()
     target = session.get('target')
     
-    aliases = {"Russia": "Russian Federation", "Usa": "United States", "Uk": "United Kingdom"}
+    aliases = {"Usa": "United States", "Uk": "United Kingdom"}
     if user_guess in aliases:
         user_guess = aliases[user_guess]
 
