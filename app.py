@@ -61,7 +61,6 @@ def home():
 
 @app.route("/guess", methods=["POST"])
 def process_guess():
-    # --- ANTI-CHEAT: Stop them from guessing if they already won ---
     if session.get('has_won'):
         return jsonify({"status": "error", "message": "You already won today! Come back tomorrow."})
 
@@ -71,12 +70,10 @@ def process_guess():
     user_guess = request.form.get("guess").strip().title()
     target = session.get('target')
     
-    # 1. Alias check
     aliases = {"Russia": "Russian Federation", "Usa": "United States", "Uk": "United Kingdom"}
     if user_guess in aliases:
         user_guess = aliases[user_guess]
 
-    # 2. Fuzzy Matching
     if user_guess in valid_countries:
         final_guess = user_guess
     else:
@@ -86,27 +83,29 @@ def process_guess():
         else:
             return jsonify({"status": "error", "message": f"❌ '{user_guess}' not found. Check spelling!"})
 
-    # 3. Process the Game Logic
     session['guess_count'] += 1
     
     if final_guess == target:
-        elapsed = time.time() - session['start_time']
+        # 1. Calculate the raw time
+        raw_time = time.time() - session['start_time']
         
-        # --- TIMER FIX: Freeze the time and save it to the session! ---
-        session['final_time'] = elapsed 
+        # 2. Calculate the penalty (3 seconds per guess)
+        penalty_seconds = session['guess_count'] * 3
         
-        # --- ANTI-CHEAT: Mark them as a winner so they can't play again ---
+        # 3. Add them together for the final score!
+        total_time = raw_time + penalty_seconds
+        
+        session['final_time'] = total_time 
         session['has_won'] = True 
         
-        mins, secs = int(elapsed // 60), elapsed % 60
+        mins, secs = int(total_time // 60), total_time % 60
         time_str = f"{mins}m {secs:.1f}s" if mins > 0 else f"{secs:.1f}s"
         
         return jsonify({
             "status": "win", 
-            "message": f"🎉 You Won! {final_guess} is correct! Took {session['guess_count']} guesses in {time_str}."
+            "message": f"🎉 You Won! {final_guess} is correct! Took {session['guess_count']} guesses in {time_str} (includes +{penalty_seconds}s penalty)."
         })
     else:
-        # Ask our game engine to do the math using the target stored in the session
         dist, bearing = game_engine.country_dist(target, final_guess)
         return jsonify({
             "status": "continue", 
