@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="game-container">
-        <h1>🌍 Welcome to Geo Puzzle!</h1>
+        <h1>🌍 Welcome to Conway's Geo Puzzle!</h1>
         <p>Guess the target country based on distance and direction hints.</p>
         <p>The leaderboard is ranked by time, and every guess (apart from your first) will cost you +3s.</p>
         
@@ -34,20 +34,17 @@
         </div>
     </div>
 
-<script>
-        // Read the locked status directly from Python when the page loads!
+    <script>
         let hasWon = {{ 'true' if has_won else 'false' }};
         let hasSubmitted = {{ 'true' if submitted else 'false' }};
         let currentGuesses = {{ guesses }}; 
-        let shareGrid = "{{ share_grid }}"; // NEW
-        let shareTime = "{{ time_str }}";   // NEW
+        let shareGrid = "{{ share_grid }}"; 
+        let shareTime = "{{ time_str }}";   
 
-        // If they already won but haven't submitted, hide the form
         if (hasWon && !hasSubmitted) {
             document.getElementById("guessForm").style.display = "none";
         }
 
-        // If they already submitted their score, show their personal result and the leaderboard
         if (hasSubmitted) {
             document.getElementById("guessForm").style.display = "none";
             showFinalScreen();
@@ -57,7 +54,6 @@
             e.preventDefault(); 
             if (hasWon) return; 
 
-            // Add to the guess counter locally
             currentGuesses++;
 
             let formData = new FormData(this);
@@ -73,8 +69,8 @@
             
             if (data.status === "win") {
                 hasWon = true;
-                shareGrid = data.grid;      // NEW: Update the local grid
-                shareTime = data.time_str;  // NEW: Update the local time
+                shareGrid = data.grid;      
+                shareTime = data.time_str;  
                 document.getElementById("guessForm").style.display = "none";
                 showLeaderboardEntry();
             }
@@ -91,8 +87,7 @@
             ` + resultsDiv.innerHTML;
         }
 
-        // NEW: This builds the final victory screen
-function showFinalScreen() {
+        function showFinalScreen() {
             document.getElementById("results").innerHTML = `
                 <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #166534;">
                     <h3 style="margin: 0;">🎉 You found today's country in ${currentGuesses} guesses!</h3>
@@ -107,19 +102,15 @@ function showFinalScreen() {
             loadLeaderboard();
         }
 
-        // NEW: The Clipboard logic!
         function copyShareText() {
-            // Build the text block
             let text = `🌍 GeoPuzzle\nGuesses: ${currentGuesses} | Time: ${shareTime}\n${shareGrid}\nPlay at: https://conways-geo-puzzle.onrender.com`;
             
-            // Ask the browser to copy it
             navigator.clipboard.writeText(text).then(() => {
                 let btn = document.getElementById("shareBtn");
                 btn.innerText = "✅ Copied!";
-                setTimeout(() => { btn.innerText = "🔗 Share Result"; }, 2000); // Reset button text after 2s
+                setTimeout(() => { btn.innerText = "🔗 Share Result"; }, 2000); 
             }).catch(err => {
                 console.error("Failed to copy:", err);
-                // Fallback just in case they are on an old browser
                 alert("Clipboard access denied. Copy your text below:\n\n" + text); 
             });
         }
@@ -141,7 +132,7 @@ function showFinalScreen() {
                 
                 if (response.ok && result.status === "success") {
                     hasSubmitted = true;
-                    showFinalScreen(); // Switch to the final victory screen!
+                    showFinalScreen(); 
                 } else {
                     alert("Server Error: " + (result.message || "Could not save score."));
                     btn.innerText = "Error";
@@ -171,7 +162,6 @@ function showFinalScreen() {
                 });
                 html += "</table>";
                 
-                // Inject into the new leaderboard-table div we created in showFinalScreen()
                 let targetDiv = document.getElementById("leaderboard-table") || document.getElementById("results");
                 targetDiv.innerHTML = html;
             } catch(err) {
