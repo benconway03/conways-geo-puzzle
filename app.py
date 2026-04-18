@@ -60,8 +60,9 @@ def home():
                            has_won=session.get('has_won', False), 
                            submitted=session.get('submitted_score', False),
                            guesses=session.get('guess_count', 0),
-                           share_grid="".join(session.get('grid', [])), # <-- NEW
-                           time_str=session.get('time_str', ""))        # <-- NEW
+                           share_grid="".join(session.get('grid', [])), 
+                           time_str=session.get('time_str', ""),
+                           countries=valid_countries)
 
 
 @app.route("/guess", methods=["POST"])

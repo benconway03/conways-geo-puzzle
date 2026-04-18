@@ -13,9 +13,15 @@
         <p>The leaderboard is ranked by time, and every guess (apart from your first) will cost you +3s.</p>
         
         <form id="guessForm">
-            <input type="text" id="guessInput" name="guess" placeholder="Enter a country..." autocomplete="off" required>
+            <input type="text" id="guessInput" name="guess" placeholder="Enter a country..." autocomplete="off" list="country-list" required>
             <button type="submit">Guess</button>
         </form>
+
+        <datalist id="country-list">
+            {% for country in countries %}
+                <option value="{{ country }}"></option>
+            {% endfor %}
+        </datalist>
 
         <div id="results">
             {% if has_won and not submitted %}
