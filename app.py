@@ -6,6 +6,8 @@ import datetime
 from datetime import timedelta
 import os
 from pymongo import MongoClient
+import random
+
 
 # 1. Grab the secret URL from Render's environment variables
 MONGO_URI = os.environ.get("MONGO_URI")
@@ -181,6 +183,30 @@ def admin_clear_board():
         """
     else:
         return "Error: Database not connected."
+    
+@app.route("/admin-random-target")
+def admin_random_target():
+    # 1. Security Check
+    secret_key = request.args.get("key")
+    if secret_key != "resetcountry1!": 
+        return "Unauthorized: Nice try, hacker!", 401
+
+    # 2. Pick a completely random country from your valid list
+    # (Bypassing the GMT daily clock entirely)
+    random_country = random.choice(valid_countries)
+
+    # 3. Override the session variables for THIS browser only
+    session['target'] = random_country
+    session['start_time'] = None
+    session['guess_count'] = 0
+    session['has_won'] = False
+    session['submitted_score'] = False
+    
+    return f"""
+    <h3>Success! Rapid Random Mode Engaged.</h3> 
+    <p>Your target country has been randomly set to: <strong>{random_country}</strong></p>
+    <a href='/'>Click here to start testing</a>
+    """
 
 if __name__ == "__main__":
     app.run(debug=True)
