@@ -6,21 +6,20 @@ import datetime
 from datetime import timedelta
 import os
 from pymongo import MongoClient
+import certifi
 import random
 
-
-# 1. Grab the secret URL from Render's environment variables
 MONGO_URI = os.environ.get("MONGO_URI")
 
-# 2. Connect to MongoDB
-# (If we are running locally on your PC and haven't set the variable, we catch the error)
 if MONGO_URI:
-    client = MongoClient(MONGO_URI)
-    db = client['geogame_db']       # Creates a database
-    leaderboard = db['leaderboard'] # Creates a collection (table)
+    client = MongoClient(MONGO_URI, tlsCAFile=certifi.where()) 
+    db = client['geogame_db']       
+    leaderboard = db['leaderboard'] 
+    game_settings = db['settings'] # <-- New line here
 else:
     print("WARNING: MONGO_URI not found. Leaderboard won't save permanently.")
-    leaderboard = None
+    leaderboard = None 
+    game_settings = None # <-- New line here
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key_change_this" # Required for sessions to work
@@ -35,9 +34,21 @@ def home():
     session.permanent = True 
     today = str(datetime.datetime.now(datetime.timezone.utc).date())
 
-    if session.get('date') != today:
+    # 1. Ask MongoDB if an admin set a global target for today
+    global_target = None
+    if game_settings is not None:
+        override = game_settings.find_one({'setting': 'global_target', 'date': today})
+        if override:
+            global_target = override['country']
+
+    # 2. If no admin override exists, use the standard daily math
+    if not global_target:
+        global_target = game_engine.get_daily_country()
+
+    # 3. If it's a new day OR the admin changed the target mid-day, reset the player!
+    if session.get('date') != today or session.get('target') != global_target:
         session['date'] = today
-        session['target'] = game_engine.get_daily_country()
+        session['target'] = global_target
         session['start_time'] = None
         session['guess_count'] = 0
         session['has_won'] = False
@@ -46,7 +57,7 @@ def home():
     return render_template("index.html", 
                            has_won=session.get('has_won', False), 
                            submitted=session.get('submitted_score', False),
-                           guesses=session.get('guess_count', 0)) # <-- NEW LINE
+                           guesses=session.get('guess_count', 0))
 
 @app.route("/guess", methods=["POST"])
 def process_guess():
@@ -189,23 +200,29 @@ def admin_random_target():
     # 1. Security Check
     secret_key = request.args.get("key")
     if secret_key != "resetcountry1!": 
-        return "Unauthorized: Nice try, hacker!", 401
+        return "Unauthorized", 401
 
-    # 2. Pick a completely random country from your valid list
-    # (Bypassing the GMT daily clock entirely)
     random_country = random.choice(valid_countries)
+    today = str(datetime.datetime.now(datetime.timezone.utc).date())
 
-    # 3. Override the session variables for THIS browser only
-    session['target'] = random_country
-    session['start_time'] = None
-    session['guess_count'] = 0
-    session['has_won'] = False
-    session['submitted_score'] = False
-    
+    if game_settings is not None:
+        # 2. Save this new target to MongoDB so ALL players see it
+        # (upsert=True means "update it if it exists, create it if it doesn't")
+        game_settings.update_one(
+            {'setting': 'global_target'},
+            {'$set': {'country': random_country, 'date': today}},
+            upsert=True
+        )
+        
+        # 3. Wipe today's leaderboard so scores don't mix!
+        if leaderboard is not None:
+            leaderboard.delete_many({'date': today})
+
     return f"""
-    <h3>Success! Rapid Random Mode Engaged.</h3> 
-    <p>Your target country has been randomly set to: <strong>{random_country}</strong></p>
-    <a href='/'>Click here to start testing</a>
+    <h3>Success! Global Random Target Set.</h3> 
+    <p>The target for EVERYONE has been changed to: <strong>{random_country}</strong></p>
+    <p>Today's leaderboard has been wiped clean to keep things fair.</p>
+    <a href='/dev-reset'>Click here to reset your own browser and play it!</a>
     """
 
 if __name__ == "__main__":
