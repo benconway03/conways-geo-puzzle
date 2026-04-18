@@ -9,39 +9,38 @@ import time # Added the time module
 class GeoGame:
 
     def calculate_haversine_distance(self, lat1, lon1, lat2, lon2):
-        # Radius of the Earth in kilometers
-        R = 6371.0 
-
-        lat1_rad = math.radians(lat1)
-        lon1_rad = math.radians(lon1)
-        lat2_rad = math.radians(lat2)
-        lon2_rad = math.radians(lon2)
-
-        dlat = lat2_rad - lat1_rad
-        dlon = lon2_rad - lon1_rad
-
-        # Haversine formula
-        a = math.sin(dlat / 2)**2 + \
-            math.cos(lat1_rad) * math.cos(lat2_rad) * \
-            math.sin(dlon / 2)**2
-            
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-        distance = R * c
+        dLat = lat2 - lat1
+        dLon = lon2 - lon1
+        
+        # 1. Map Wrap-Around: Force the math to take the shortest path across the date line
+        dLon = (dLon + 180) % 360 - 180
+        
+        # 2. Latitude Squeeze: Longitude lines get closer together near the poles
+        avg_lat = math.radians((lat1 + lat2) / 2.0)
+        dLon_scaled = dLon * math.cos(avg_lat)
+        
+        # 3. Pythagorean theorem on the newly scaled flat map
+        degree_distance = math.sqrt((dLat ** 2) + (dLon_scaled ** 2))
+        
+        # Convert to kilometers
+        distance = degree_distance * 111.0
         
         return distance
 
     def get_direction(self, lat1, lon1, lat2, lon2):
-        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-        
+        dLat = lat2 - lat1
         dLon = lon2 - lon1
-        y = math.sin(dLon) * math.cos(lat2)
-        x = math.cos(lat1) * math.sin(lat2) - \
-            math.sin(lat1) * math.cos(lat2) * math.cos(dLon)
         
-        initial_bearing = math.atan2(y, x)
+        # Map Wrap-Around so the compass points the shortest way
+        dLon = (dLon + 180) % 360 - 180
         
-        bearing = (math.degrees(initial_bearing) + 360) % 360
+        # Latitude Squeeze so the compass angle doesn't get distorted
+        avg_lat = math.radians((lat1 + lat2) / 2.0)
+        dLon_scaled = dLon * math.cos(avg_lat)
+        
+        # Calculate the angle using the scaled flat coordinates
+        initial_bearing = math.degrees(math.atan2(dLon_scaled, dLat))
+        bearing = (initial_bearing + 360) % 360
         
         directions = ["North ⬆️", 
                       "North-East ↗️", 
