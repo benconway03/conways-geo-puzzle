@@ -158,5 +158,29 @@ def dev_reset():
     session.clear()
     return redirect(url_for('home'))
 
+@app.route("/admin-clear-board")
+def admin_clear_board():
+    # 1. A basic security check! 
+    # The URL must end with ?key=your_secret_password
+    secret_key = request.args.get("key")
+    if secret_key != "leaderboardreset1!": # Change this to whatever password you want!
+        return "Unauthorized", 401
+
+    # 2. Get today's date
+    today = str(datetime.datetime.now(datetime.timezone.utc).date())
+    
+    if leaderboard is not None:
+        # 3. Ask PyMongo to delete all entries matching today's date
+        result = leaderboard.delete_many({'date': today})
+        
+        # 4. Print a success message showing how many scores were wiped
+        return f"""
+        <h3>Success!</h3> 
+        <p>Deleted {result.deleted_count} scores for {today}.</p>
+        <a href='/'>Click here to go back to the game</a>
+        """
+    else:
+        return "Error: Database not connected."
+
 if __name__ == "__main__":
     app.run(debug=True)
