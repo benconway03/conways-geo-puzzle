@@ -3,6 +3,7 @@ from geogame import GeoGame  # Imports your exact class from your other file!
 import difflib
 import time
 import datetime
+from datetime import timedelta
 import os
 from pymongo import MongoClient
 
@@ -21,6 +22,7 @@ else:
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key_change_this" # Required for sessions to work
+app.permanent_session_lifetime = timedelta(days=30)
 
 # Initialize the game engine once for the server to use
 game_engine = GeoGame()
@@ -28,13 +30,28 @@ valid_countries = game_engine.df_countries['COUNTRY'].tolist()
 
 @app.route("/")
 def home():
-    session['target'] = game_engine.get_daily_country()
-    session['start_time'] = None  # <--- Change this line
-    session['guess_count'] = 0
-    return render_template("index.html")
+    session.permanent = True # Tell the browser to save this cookie
+    today = str(datetime.datetime.now(datetime.timezone.utc).date())
+
+    # Only reset the game if they haven't played today!
+    if session.get('date') != today:
+        session['date'] = today
+        session['target'] = game_engine.get_daily_country()
+        session['start_time'] = None
+        session['guess_count'] = 0
+        session['has_won'] = False
+        session['submitted_score'] = False
+
+    # Pass their current status directly to the webpage when it loads
+    return render_template("index.html", 
+                           has_won=session.get('has_won', False), 
+                           submitted=session.get('submitted_score', False))
 
 @app.route("/guess", methods=["POST"])
 def process_guess():
+    # --- ANTI-CHEAT: Stop them from guessing if they already won ---
+    if session.get('has_won'):
+        return jsonify({"status": "error", "message": "You already won today! Come back tomorrow."})
 
     if session.get('start_time') is None:
         session['start_time'] = time.time()
@@ -42,7 +59,7 @@ def process_guess():
     user_guess = request.form.get("guess").strip().title()
     target = session.get('target')
     
-    # 1. Alias check (Add your aliases here just like in the terminal version!)
+    # 1. Alias check
     aliases = {"Russia": "Russian Federation", "Usa": "United States", "Uk": "United Kingdom"}
     if user_guess in aliases:
         user_guess = aliases[user_guess]
@@ -62,6 +79,13 @@ def process_guess():
     
     if final_guess == target:
         elapsed = time.time() - session['start_time']
+        
+        # --- TIMER FIX: Freeze the time and save it to the session! ---
+        session['final_time'] = elapsed 
+        
+        # --- ANTI-CHEAT: Mark them as a winner so they can't play again ---
+        session['has_won'] = True 
+        
         mins, secs = int(elapsed // 60), elapsed % 60
         time_str = f"{mins}m {secs:.1f}s" if mins > 0 else f"{secs:.1f}s"
         
@@ -77,43 +101,37 @@ def process_guess():
             "message": f"❌ {final_guess} is {dist} away. Head {bearing}"
         })
 
+
 @app.route("/save_score", methods=["POST"])
 def save_score():
-    name = request.form.get("name").strip()[:20]
-    guesses = session.get('guess_count')
-    elapsed = time.time() - session.get('start_time')
-    today = str(datetime.datetime.now(datetime.timezone.utc).date())
-    
-    if leaderboard is not None:
-        # PyMongo uses 'insert_one' to save a dictionary
-        leaderboard.insert_one({
-            'name': name,
-            'guesses': guesses,
-            'time': round(elapsed, 2),
-            'date': today
-        })
-    
-    return jsonify({"status": "success"})
+    # --- ANTI-CHEAT: Stop them from submitting multiple names ---
+    if session.get('submitted_score'):
+        return jsonify({"status": "error", "message": "Score already submitted today!"})
 
-@app.route("/get_leaderboard")
-def get_leaderboard():
-    today = str(datetime.datetime.now(datetime.timezone.utc).date())
+    try:
+        name = request.form.get("name").strip()[:20]
+        guesses = session.get('guess_count')
+        
+        # --- Use the frozen time from when they won ---
+        elapsed = session.get('final_time', time.time() - session.get('start_time'))
+        today = str(datetime.datetime.now(datetime.timezone.utc).date())
+        
+        if leaderboard is not None:
+            # PyMongo uses 'insert_one' to save a dictionary
+            leaderboard.insert_one({
+                'name': name,
+                'guesses': guesses,
+                'time': round(elapsed, 2),
+                'date': today
+            })
+            # --- ANTI-CHEAT: Lock the submission form ---
+            session['submitted_score'] = True 
+            
+        return jsonify({"status": "success"})
     
-    if leaderboard is not None:
-        # Ask MongoDB to find today's scores, sort them by least guesses (1) 
-        # then by fastest time (1), and only give us the top 10
-        scores_cursor = leaderboard.find({'date': today}).sort([('guesses', 1), ('time', 1)]).limit(10)
-        
-        # Convert the cursor to a standard Python list
-        scores = list(scores_cursor)
-        
-        # PyMongo adds a special '_id' to everything, which breaks JSON, so we convert it to string
-        for s in scores:
-            s['_id'] = str(s['_id'])
-    else:
-        scores = []
-        
-    return jsonify(scores)
+    except Exception as e:
+        print(f"Database Error: {e}")
+        return jsonify({"status": "error"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

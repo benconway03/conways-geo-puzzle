@@ -17,13 +17,37 @@
         </form>
 
         <div id="results">
-            </div>
+            {% if has_won and not submitted %}
+                <div id="leaderboard-entry">
+                    <h3>GG! Enter your name for the leaderboard:</h3>
+                    <input type="text" id="playerName" placeholder="Your Name">
+                    <button onclick="submitScore()">Submit</button>
+                </div>
+            {% endif %}
+        </div>
     </div>
 
     <script>
-        // This JavaScript stops the page from reloading and talks to app.py
+        // Read the locked status directly from Python when the page loads!
+        let hasWon = {{ 'true' if has_won else 'false' }};
+        let hasSubmitted = {{ 'true' if submitted else 'false' }};
+
+        // If they already won, disable the typing box immediately
+        if (hasWon) {
+            let inputField = document.getElementById("guessInput");
+            inputField.disabled = true;
+            inputField.placeholder = "Come back tomorrow!";
+        }
+
+        // If they already submitted their score, show the leaderboard immediately
+        if (hasSubmitted) {
+            loadLeaderboard();
+        }
+
         document.getElementById("guessForm").addEventListener("submit", async function(e) {
             e.preventDefault(); 
+            if (hasWon) return; // Extra check
+
             let formData = new FormData(this);
             let response = await fetch("/guess", { method: "POST", body: formData });
             let data = await response.json();
@@ -36,7 +60,10 @@
             document.getElementById("guessInput").value = "";
             
             if (data.status === "win") {
-                document.getElementById("guessInput").disabled = true;
+                hasWon = true;
+                let inputField = document.getElementById("guessInput");
+                inputField.disabled = true;
+                inputField.placeholder = "Come back tomorrow!";
                 showLeaderboardEntry();
             }
         });
@@ -54,11 +81,30 @@
 
         async function submitScore() {
             let name = document.getElementById("playerName").value;
+            if (!name) return; 
+
             let formData = new FormData();
             formData.append("name", name);
 
-            await fetch("/save_score", { method: "POST", body: formData });
-            loadLeaderboard();
+            let btn = document.querySelector("#leaderboard-entry button");
+            btn.innerText = "Saving...";
+            btn.disabled = true;
+
+            try {
+                let response = await fetch("/save_score", { method: "POST", body: formData });
+                
+                if (response.ok) {
+                    hasSubmitted = true;
+                    loadLeaderboard();
+                } else {
+                    alert("Server Error: Could not save score.");
+                    btn.innerText = "Error";
+                }
+            } catch (err) {
+                alert("Network Error: Could not reach the server.");
+                btn.innerText = "Submit";
+                btn.disabled = false;
+            }
         }
 
         async function loadLeaderboard() {
@@ -72,7 +118,7 @@
             html += "</table>";
             
             document.getElementById("results").innerHTML = html;
-        };
+        }
     </script>
 </body>
 </html>
