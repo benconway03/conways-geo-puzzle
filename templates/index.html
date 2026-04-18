@@ -20,7 +20,7 @@
             {% if has_won and not submitted %}
                 <div id="leaderboard-entry">
                     <h3>GG! Enter your name for the leaderboard:</h3>
-                    <input type="text" id="playerName" placeholder="Your Name">
+                    <input type="text" id="playerName" placeholder="Your Name" maxlength="20">
                     <button onclick="submitScore()">Submit</button>
                 </div>
             {% endif %}
@@ -46,7 +46,7 @@
 
         document.getElementById("guessForm").addEventListener("submit", async function(e) {
             e.preventDefault(); 
-            if (hasWon) return; // Extra check
+            if (hasWon) return; // Extra check to stop guessing after win
 
             let formData = new FormData(this);
             let response = await fetch("/guess", { method: "POST", body: formData });
@@ -54,7 +54,11 @@
             
             let resultsDiv = document.getElementById("results");
             let newHint = document.createElement("p");
-            newHint.innerHTML = data.message;
+            
+            // SECURITY FIX 1: Use innerText instead of innerHTML so if a user 
+            // types an HTML tag as their guess, it doesn't break the page.
+            newHint.innerText = data.message; 
+            
             resultsDiv.prepend(newHint);
 
             document.getElementById("guessInput").value = "";
@@ -73,7 +77,7 @@
             resultsDiv.innerHTML = `
                 <div id="leaderboard-entry">
                     <h3>GG! Enter your name for the leaderboard:</h3>
-                    <input type="text" id="playerName" placeholder="Your Name">
+                    <input type="text" id="playerName" placeholder="Your Name" maxlength="20">
                     <button onclick="submitScore()">Submit</button>
                 </div>
             ` + resultsDiv.innerHTML;
@@ -81,7 +85,7 @@
 
         async function submitScore() {
             let name = document.getElementById("playerName").value;
-            if (!name) return; 
+            if (!name) return; // Prevent empty names
 
             let formData = new FormData();
             formData.append("name", name);
@@ -107,13 +111,21 @@
             }
         }
 
+        // SECURITY FIX 2: A quick helper function to strip malicious code out of names
+        function escapeHTML(str) {
+            let div = document.createElement('div');
+            div.innerText = str;
+            return div.innerHTML;
+        }
+
         async function loadLeaderboard() {
             let response = await fetch("/get_leaderboard");
             let scores = await response.json();
             
             let html = "<h3>Today's Top 10</h3><table style='width:100%'><tr><th>Name</th><th>Guesses</th><th>Time</th></tr>";
             scores.forEach(s => {
-                html += `<tr><td>${s.name}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
+                // We wrap s.name in our new escapeHTML function here!
+                html += `<tr><td>${escapeHTML(s.name)}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
             });
             html += "</table>";
             
