@@ -12,14 +12,17 @@ valid_countries = game_engine.df_countries['COUNTRY'].tolist()
 
 @app.route("/")
 def home():
-    # When a user loads the page, pick a new target and reset their timer/guesses
-    session['target'] = game_engine.gen_rand_country()
-    session['start_time'] = time.time()
+    session['target'] = game_engine.get_daily_country()
+    session['start_time'] = None  # <--- Change this line
     session['guess_count'] = 0
     return render_template("index.html")
 
 @app.route("/guess", methods=["POST"])
 def process_guess():
+
+    if session.get('start_time') is None:
+        session['start_time'] = time.time()
+
     user_guess = request.form.get("guess").strip().title()
     target = session.get('target')
     
