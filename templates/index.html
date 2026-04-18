@@ -24,29 +24,55 @@
         // This JavaScript stops the page from reloading and talks to app.py
         document.getElementById("guessForm").addEventListener("submit", async function(e) {
             e.preventDefault(); 
-            
-            let inputField = document.getElementById("guessInput");
             let formData = new FormData(this);
-
-            let response = await fetch("/guess", {
-                method: "POST",
-                body: formData
-            });
-            
+            let response = await fetch("/guess", { method: "POST", body: formData });
             let data = await response.json();
             
-            // Add the new hint to the top of the results list
             let resultsDiv = document.getElementById("results");
             let newHint = document.createElement("p");
             newHint.innerHTML = data.message;
             resultsDiv.prepend(newHint);
 
-            inputField.value = ""; // Clear the box for the next guess
+            document.getElementById("guessInput").value = "";
             
             if (data.status === "win") {
-                inputField.disabled = true; // Stop them from guessing after they win
+                document.getElementById("guessInput").disabled = true;
+                showLeaderboardEntry();
             }
         });
+
+        function showLeaderboardEntry() {
+            let resultsDiv = document.getElementById("results");
+            resultsDiv.innerHTML = `
+                <div id="leaderboard-entry">
+                    <h3>GG! Enter your name for the leaderboard:</h3>
+                    <input type="text" id="playerName" placeholder="Your Name">
+                    <button onclick="submitScore()">Submit</button>
+                </div>
+            ` + resultsDiv.innerHTML;
+        }
+
+        async function submitScore() {
+            let name = document.getElementById("playerName").value;
+            let formData = new FormData();
+            formData.append("name", name);
+
+            await fetch("/save_score", { method: "POST", body: formData });
+            loadLeaderboard();
+        }
+
+        async function loadLeaderboard() {
+            let response = await fetch("/get_leaderboard");
+            let scores = await response.json();
+            
+            let html = "<h3>Today's Top 10</h3><table style='width:100%'><tr><th>Name</th><th>Guesses</th><th>Time</th></tr>";
+            scores.forEach(s => {
+                html += `<tr><td>${s.name}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
+            });
+            html += "</table>";
+            
+            document.getElementById("results").innerHTML = html;
+        };
     </script>
 </body>
 </html>

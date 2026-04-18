@@ -119,3 +119,12 @@ button:disabled {
         transform: translateY(0);
     }
 }
+
+table {
+    margin-top: 20px;
+    border-collapse: collapse;
+}
+th, td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}

@@ -2,6 +2,10 @@ from flask import Flask, render_template, request, session, jsonify
 from geogame import GeoGame  # Imports your exact class from your other file!
 import difflib
 import time
+from tinydb import TinyDB, Query
+import datetime
+
+db = TinyDB('leaderboard.json')
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key_change_this" # Required for sessions to work
@@ -60,6 +64,37 @@ def process_guess():
             "status": "continue", 
             "message": f"❌ {final_guess} is {dist} away. Head {bearing}"
         })
+
+@app.route("/save_score", methods=["POST"])
+def save_score():
+    name = request.form.get("name").strip()[:20] # Limit to 20 chars
+    guesses = session.get('guess_count')
+    
+    # Calculate final time (same logic as before)
+    elapsed = time.time() - session.get('start_time')
+    
+    # Get today's date for the daily leaderboard
+    today = str(datetime.datetime.now(datetime.timezone.utc).date())
+    
+    # Save to database
+    db.insert({
+        'name': name,
+        'guesses': guesses,
+        'time': round(elapsed, 2),
+        'date': today
+    })
+    
+    return jsonify({"status": "success"})
+
+@app.route("/get_leaderboard")
+def get_leaderboard():
+    today = str(datetime.datetime.now(datetime.timezone.utc).date())
+    Score = Query()
+    # Fetch all scores for today, sorted by least guesses, then fastest time
+    scores = db.search(Score.date == today)
+    sorted_scores = sorted(scores, key=lambda x: (x['guesses'], x['time']))
+    
+    return jsonify(sorted_scores[:10]) # Return top 10
 
 if __name__ == "__main__":
     app.run(debug=True)
