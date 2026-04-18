@@ -90,7 +90,7 @@ def process_guess():
         raw_time = time.time() - session['start_time']
         
         # 2. Calculate the penalty (3 seconds per guess)
-        penalty_seconds = session['guess_count'] * 3
+        penalty_seconds = (session['guess_count']-1) * 3
         
         # 3. Add them together for the final score!
         total_time = raw_time + penalty_seconds
@@ -151,7 +151,7 @@ def get_leaderboard():
     if leaderboard is not None:
         # Ask MongoDB to find today's scores, sort them by least guesses (1) 
         # then by fastest time (1), and only give us the top 10
-        scores_cursor = leaderboard.find({'date': today}).sort([('guesses', 1), ('time', 1)]).limit(10)
+        scores_cursor = leaderboard.find({'date': today}).sort([('time', 1), ('guesses', 1)]).limit(10)
         
         # Convert the cursor to a standard Python list
         scores = list(scores_cursor)
