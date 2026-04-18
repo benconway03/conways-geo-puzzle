@@ -2,10 +2,22 @@ from flask import Flask, render_template, request, session, jsonify
 from geogame import GeoGame  # Imports your exact class from your other file!
 import difflib
 import time
-from tinydb import TinyDB, Query
 import datetime
+import os
+from pymongo import MongoClient
 
-db = TinyDB('leaderboard.json')
+# 1. Grab the secret URL from Render's environment variables
+MONGO_URI = os.environ.get("MONGO_URI")
+
+# 2. Connect to MongoDB
+# (If we are running locally on your PC and haven't set the variable, we catch the error)
+if MONGO_URI:
+    client = MongoClient(MONGO_URI)
+    db = client['geogame_db']       # Creates a database
+    leaderboard = db['leaderboard'] # Creates a collection (table)
+else:
+    print("WARNING: MONGO_URI not found. Leaderboard won't save permanently.")
+    leaderboard = None
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key_change_this" # Required for sessions to work
@@ -67,34 +79,41 @@ def process_guess():
 
 @app.route("/save_score", methods=["POST"])
 def save_score():
-    name = request.form.get("name").strip()[:20] # Limit to 20 chars
+    name = request.form.get("name").strip()[:20]
     guesses = session.get('guess_count')
-    
-    # Calculate final time (same logic as before)
     elapsed = time.time() - session.get('start_time')
-    
-    # Get today's date for the daily leaderboard
     today = str(datetime.datetime.now(datetime.timezone.utc).date())
     
-    # Save to database
-    db.insert({
-        'name': name,
-        'guesses': guesses,
-        'time': round(elapsed, 2),
-        'date': today
-    })
+    if leaderboard is not None:
+        # PyMongo uses 'insert_one' to save a dictionary
+        leaderboard.insert_one({
+            'name': name,
+            'guesses': guesses,
+            'time': round(elapsed, 2),
+            'date': today
+        })
     
     return jsonify({"status": "success"})
 
 @app.route("/get_leaderboard")
 def get_leaderboard():
     today = str(datetime.datetime.now(datetime.timezone.utc).date())
-    Score = Query()
-    # Fetch all scores for today, sorted by least guesses, then fastest time
-    scores = db.search(Score.date == today)
-    sorted_scores = sorted(scores, key=lambda x: (x['guesses'], x['time']))
     
-    return jsonify(sorted_scores[:10]) # Return top 10
+    if leaderboard is not None:
+        # Ask MongoDB to find today's scores, sort them by least guesses (1) 
+        # then by fastest time (1), and only give us the top 10
+        scores_cursor = leaderboard.find({'date': today}).sort([('guesses', 1), ('time', 1)]).limit(10)
+        
+        # Convert the cursor to a standard Python list
+        scores = list(scores_cursor)
+        
+        # PyMongo adds a special '_id' to everything, which breaks JSON, so we convert it to string
+        for s in scores:
+            s['_id'] = str(s['_id'])
+    else:
+        scores = []
+        
+    return jsonify(scores)
 
 if __name__ == "__main__":
     app.run(debug=True)
