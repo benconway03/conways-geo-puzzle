@@ -2,5 +2,5 @@ pandas
 numpy
 Flask
 gunicorn
-tinydb
-pymongo
+pymongo[srv]
+certifi
