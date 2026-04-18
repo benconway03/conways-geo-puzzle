@@ -131,6 +131,26 @@ def save_score():
     except Exception as e:
         print(f"Database Error: {e}")
         return jsonify({"status": "error"}), 500
+    
+@app.route("/get_leaderboard")
+def get_leaderboard():
+    today = str(datetime.datetime.now(datetime.timezone.utc).date())
+    
+    if leaderboard is not None:
+        # Ask MongoDB to find today's scores, sort them by least guesses (1) 
+        # then by fastest time (1), and only give us the top 10
+        scores_cursor = leaderboard.find({'date': today}).sort([('guesses', 1), ('time', 1)]).limit(10)
+        
+        # Convert the cursor to a standard Python list
+        scores = list(scores_cursor)
+        
+        # PyMongo adds a special '_id' to everything, which breaks JSON, so we convert it to a string
+        for s in scores:
+            s['_id'] = str(s['_id'])
+    else:
+        scores = []
+        
+    return jsonify(scores)
 
 @app.route("/dev-reset")
 def dev_reset():
