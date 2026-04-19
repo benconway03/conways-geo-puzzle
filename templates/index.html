@@ -103,7 +103,7 @@
         }
 
         function copyShareText() {
-            let text = `🌍 GeoPuzzle\nGuesses: ${currentGuesses} | Time: ${shareTime}\n${shareGrid}\nPlay at: https://conways-geo-puzzle.onrender.com`;
+            let text = `🌍 GeoPuzzle\nGuesses: ${currentGuesses} | Time: ${shareTime}\n${shareGrid}\nPlay at: https://geo-puzzle.onrender.com`;
             
             navigator.clipboard.writeText(text).then(() => {
                 let btn = document.getElementById("shareBtn");
