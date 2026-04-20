@@ -8,11 +8,31 @@
 </head>
 <body>
     <div class="game-container">
-        <h1>🌍 Welcome to Geo Puzzle!</h1>
+        
+        <div style="text-align: right; margin-bottom: 10px;">
+            {% if is_practice %}
+                <a href="/" style="background-color: #e2e8f0; padding: 5px 10px; border-radius: 5px; text-decoration: none; color: black; font-weight: bold;">🎯 Back to Daily Game</a>
+            {% else %}
+                <a href="/practice" style="background-color: #fef08a; padding: 5px 10px; border-radius: 5px; text-decoration: none; color: black; font-weight: bold;">🏋️ Practice Mode</a>
+            {% endif %}
+        </div>
+
+        <h1>🌍 {% if is_practice %}Practice Mode{% else %}Welcome to Conway's Geo Puzzle!{% endif %}</h1>
         <p>Guess the target country based on distance and direction hints.</p>
         <p>The leaderboard is ranked by time, and every guess (apart from your first) will cost you +3s.</p>
         
-        <form id="guessForm">
+        {% if not is_practice %}
+            <button type="button" id="toggleBoardBtn" onclick="toggleLiveBoard()" style="background-color: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; margin-bottom: 15px; font-size: 0.9em;">
+                🏆 View Live Leaderboard
+            </button>
+            <div id="live-board-container" style="display: none; background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; margin-bottom: 20px;"></div>
+        {% else %}
+            <button type="button" onclick="window.location.href='/reset_practice'" style="background-color: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; margin-bottom: 15px;">
+                🔄 Skip / New Random Country
+            </button>
+        {% endif %}
+
+        <form id="guessForm" data-mode="{{ 'practice' if is_practice else 'daily' }}">
             <input type="text" id="guessInput" name="guess" placeholder="Enter a country..." autocomplete="off" list="country-list" required>
             <button type="submit">Guess</button>
         </form>
@@ -24,7 +44,7 @@
         </datalist>
 
         <div id="results">
-            {% if has_won and not submitted %}
+            {% if has_won and not submitted and not is_practice %}
                 <div id="leaderboard-entry">
                     <h3>GG! Enter your name for the leaderboard:</h3>
                     <input type="text" id="playerName" placeholder="Your Name" maxlength="20">
@@ -35,17 +55,18 @@
     </div>
 
     <script>
+        let isPractice = {{ 'true' if is_practice else 'false' }};
         let hasWon = {{ 'true' if has_won else 'false' }};
         let hasSubmitted = {{ 'true' if submitted else 'false' }};
         let currentGuesses = {{ guesses }}; 
         let shareGrid = "{{ share_grid }}"; 
         let shareTime = "{{ time_str }}";   
 
-        if (hasWon && !hasSubmitted) {
+        if (hasWon && !hasSubmitted && !isPractice) {
             document.getElementById("guessForm").style.display = "none";
         }
 
-        if (hasSubmitted) {
+        if (hasSubmitted || (hasWon && isPractice)) {
             document.getElementById("guessForm").style.display = "none";
             showFinalScreen();
         }
@@ -57,7 +78,9 @@
             currentGuesses++;
 
             let formData = new FormData(this);
-            let response = await fetch("/guess", { method: "POST", body: formData });
+            // Decide which URL to fetch based on the mode!
+            let endpoint = this.dataset.mode === 'practice' ? "/guess_practice" : "/guess";
+            let response = await fetch(endpoint, { method: "POST", body: formData });
             let data = await response.json();
             
             let resultsDiv = document.getElementById("results");
@@ -72,7 +95,13 @@
                 shareGrid = data.grid;      
                 shareTime = data.time_str;  
                 document.getElementById("guessForm").style.display = "none";
-                showLeaderboardEntry();
+                
+                // If practice, skip the leaderboard name-entry and go straight to final screen
+                if (isPractice) {
+                    showFinalScreen();
+                } else {
+                    showLeaderboardEntry();
+                }
             }
         });
 
@@ -88,29 +117,50 @@
         }
 
         function showFinalScreen() {
-            document.getElementById("results").innerHTML = `
+            let containerHTML = `
                 <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #166534;">
-                    <h3 style="margin: 0;">🎉 You found today's country in ${currentGuesses} guesses!</h3>
-                    <p style="margin: 5px 0 15px 0; font-size: 0.9em;">Come back tomorrow for a new puzzle.</p>
-                    
+                    <h3 style="margin: 0;">🎉 You found the country in ${currentGuesses} guesses!</h3>
+                    <p style="margin: 5px 0 15px 0; font-size: 0.9em;">
+                        ${isPractice ? "Great job practicing!" : "Come back tomorrow for a new puzzle."}
+                    </p>
+            `;
+
+            // Display a Play Again button for Practice, or a Share button for Daily
+            if (isPractice) {
+                containerHTML += `
+                    <button onclick="window.location.href='/reset_practice'" style="background-color: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-weight: bold;">
+                        🔄 Play Another Practice Game
+                    </button>
+                `;
+            } else {
+                containerHTML += `
                     <button onclick="copyShareText()" id="shareBtn" style="background-color: #22c55e; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-weight: bold;">
                         🔗 Share Result
                     </button>
-                </div>
-                <div id="leaderboard-table"></div>
-            `;
-            loadLeaderboard();
+                `;
+            }
+
+            containerHTML += `</div>`;
+
+            // Only inject the leaderboard table if it's the daily game
+            if (!isPractice) {
+                containerHTML += `<div id="leaderboard-table"></div>`;
+            }
+
+            document.getElementById("results").innerHTML = containerHTML;
+            
+            if (!isPractice) {
+                loadLeaderboard();
+            }
         }
 
         function copyShareText() {
             let text = `🌍 GeoPuzzle\nGuesses: ${currentGuesses} | Time: ${shareTime}\n${shareGrid}\nPlay at: https://geo-puzzle.onrender.com`;
-            
             navigator.clipboard.writeText(text).then(() => {
                 let btn = document.getElementById("shareBtn");
                 btn.innerText = "✅ Copied!";
                 setTimeout(() => { btn.innerText = "🔗 Share Result"; }, 2000); 
             }).catch(err => {
-                console.error("Failed to copy:", err);
                 alert("Clipboard access denied. Copy your text below:\n\n" + text); 
             });
         }
@@ -138,8 +188,6 @@
                     btn.innerText = "Error";
                 }
             } catch (err) {
-                console.error("Fetch Error:", err);
-                alert("Network Error: Could not reach the server.");
                 btn.innerText = "Submit";
                 btn.disabled = false;
             }
@@ -165,9 +213,42 @@
                 let targetDiv = document.getElementById("leaderboard-table") || document.getElementById("results");
                 targetDiv.innerHTML = html;
             } catch(err) {
-                console.error("Leaderboard Error:", err);
                 let targetDiv = document.getElementById("leaderboard-table") || document.getElementById("results");
                 targetDiv.innerHTML = "<p style='color:red;'>⚠️ Error loading leaderboard.</p>";
+            }
+        }
+
+        async function toggleLiveBoard() {
+            let container = document.getElementById("live-board-container");
+            let btn = document.getElementById("toggleBoardBtn");
+
+            if (container.style.display === "none") {
+                container.style.display = "block";
+                btn.innerText = "Hide Leaderboard";
+                container.innerHTML = "<p style='text-align:center; color:gray;'>Loading...</p>";
+
+                try {
+                    let response = await fetch("/get_leaderboard");
+                    let scores = await response.json();
+                    
+                    if (scores.length === 0) {
+                        container.innerHTML = "<p style='text-align:center;'>No scores yet today! Be the first!</p>";
+                        return;
+                    }
+
+                    let html = "<h3 style='margin-top:0; font-size: 1.1em;'>Today's Top 10</h3><table style='width:100%; text-align:left; font-size: 0.9em;'><tr><th>Name</th><th>Guesses</th><th>Time</th></tr>";
+                    scores.forEach(s => {
+                        html += `<tr><td>${escapeHTML(s.name)}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
+                    });
+                    html += "</table>";
+                    
+                    container.innerHTML = html;
+                } catch(err) {
+                    container.innerHTML = "<p style='color:red;'>⚠️ Error loading leaderboard.</p>";
+                }
+            } else {
+                container.style.display = "none";
+                btn.innerText = "🏆 View Live Leaderboard";
             }
         }
     </script>

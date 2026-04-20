@@ -170,6 +170,101 @@ def get_leaderboard():
         
     return jsonify(scores)
 
+# --- PRACTICE MODE ROUTES ---
+
+@app.route("/practice")
+def practice():
+    # If they don't have a practice game going, start one!
+    if not session.get('p_target'):
+        session['p_target'] = random.choice(valid_countries)
+        session['p_start_time'] = None
+        session['p_guess_count'] = 0
+        session['p_has_won'] = False
+        session['p_grid'] = []
+        session['p_time_str'] = ""
+
+    # We pass 'is_practice=True' so the HTML knows to hide the leaderboard
+    # We pass 'submitted=True' to trick the HTML into hiding the name-entry box!
+    return render_template("index.html", 
+                           is_practice=True, 
+                           has_won=session.get('p_has_won', False), 
+                           submitted=True, 
+                           guesses=session.get('p_guess_count', 0),
+                           share_grid="".join(session.get('p_grid', [])), 
+                           time_str=session.get('p_time_str', ""),
+                           countries=valid_countries)
+
+@app.route("/reset_practice")
+def reset_practice():
+    # Wipes the practice variables and picks a new random country
+    session['p_target'] = random.choice(valid_countries)
+    session['p_start_time'] = None
+    session['p_guess_count'] = 0
+    session['p_has_won'] = False
+    session['p_grid'] = []
+    session['p_time_str'] = ""
+    return redirect(url_for('practice'))
+
+@app.route("/guess_practice", methods=["POST"])
+def process_practice_guess():
+    if session.get('p_has_won'):
+        return jsonify({"status": "error", "message": "You already won! Click 'Skip / New Country' to play again."})
+
+    if session.get('p_start_time') is None:
+        session['p_start_time'] = time.time()
+
+    user_guess = request.form.get("guess").strip().title()
+    target = session.get('p_target')
+    
+    aliases = {"Russia": "Russian Federation", "Usa": "United States", "Uk": "United Kingdom"}
+    if user_guess in aliases:
+        user_guess = aliases[user_guess]
+
+    if user_guess in valid_countries:
+        final_guess = user_guess
+    else:
+        matches = difflib.get_close_matches(user_guess, valid_countries, n=1, cutoff=0.7)
+        if matches:
+            final_guess = matches[0]
+        else:
+            return jsonify({"status": "error", "message": f"❌ '{user_guess}' not found. Check spelling!"})
+
+    session['p_guess_count'] += 1
+    
+    if 'p_grid' not in session:
+        session['p_grid'] = []
+    
+    if final_guess == target:
+        session['p_grid'].append("🟩") 
+        session.modified = True 
+        
+        raw_time = time.time() - session['p_start_time']
+        penalty_seconds = (session['p_guess_count']-1) * 3
+        total_time = raw_time + penalty_seconds
+        
+        session['p_final_time'] = total_time 
+        session['p_has_won'] = True 
+        
+        mins, secs = int(total_time // 60), total_time % 60
+        time_str = f"{mins}m {secs:.1f}s" if mins > 0 else f"{secs:.1f}s"
+        session['p_time_str'] = time_str 
+
+        return jsonify({
+            "status": "win", 
+            "message": f"🎉 You Won! {final_guess} is correct! Took {session['p_guess_count']} guesses.",
+            "grid": "".join(session['p_grid']), 
+            "time_str": time_str              
+        })
+    else:
+        session['p_grid'].append("🟥") 
+        session.modified = True  
+        
+        dist, bearing = game_engine.country_dist(target, final_guess)
+        return jsonify({
+            "status": "continue", 
+            "message": f"❌ {final_guess} is {dist} away. Head {bearing}"
+        })
+
 @app.route("/dev-reset")
 def dev_reset():
 
