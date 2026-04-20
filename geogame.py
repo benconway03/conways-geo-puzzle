@@ -6,6 +6,8 @@ import difflib
 import time
 import datetime
 
+# The goal of this class is to set-up the framework for a game where 
+
 class GeoGame:
 
     def calculate_haversine_distance(self, lat1, lon1, lat2, lon2):
