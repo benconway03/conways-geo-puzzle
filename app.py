@@ -183,12 +183,11 @@ def practice():
         session['p_grid'] = []
         session['p_time_str'] = ""
 
-    # We pass 'is_practice=True' so the HTML knows to hide the leaderboard
-    # We pass 'submitted=True' to trick the HTML into hiding the name-entry box!
+    # FIX: We changed submitted=True to submitted=False here!
     return render_template("index.html", 
                            is_practice=True, 
                            has_won=session.get('p_has_won', False), 
-                           submitted=True, 
+                           submitted=False, 
                            guesses=session.get('p_guess_count', 0),
                            share_grid="".join(session.get('p_grid', [])), 
                            time_str=session.get('p_time_str', ""),
