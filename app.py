@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, session, jsonify, redirect, url_for
-from geogame import GeoGame  # Imports your exact class from your other file!
+from geogame import GeoGame 
 import difflib
 import time
 import datetime
@@ -15,17 +15,16 @@ if MONGO_URI:
     client = MongoClient(MONGO_URI, tlsCAFile=certifi.where()) 
     db = client['geogame_db']       
     leaderboard = db['leaderboard'] 
-    game_settings = db['settings'] # <-- New line here
+    game_settings = db['settings']
 else:
     print("WARNING: MONGO_URI not found. Leaderboard won't save permanently.")
     leaderboard = None 
-    game_settings = None # <-- New line here
+    game_settings = None
 
 app = Flask(__name__)
-app.secret_key = "super_secret_key_change_this" # Required for sessions to work
+app.secret_key = "bjlasd87923jkf9832!*^&dskkasd" 
 app.permanent_session_lifetime = timedelta(days=30)
 
-# Initialize the game engine once for the server to use
 game_engine = GeoGame()
 valid_countries = game_engine.df_countries['COUNTRY'].tolist()
 
@@ -34,18 +33,15 @@ def home():
     session.permanent = True 
     today = str(datetime.datetime.now(datetime.timezone.utc).date())
 
-    # 1. Ask MongoDB if an admin set a global target for today
     global_target = None
     if game_settings is not None:
         override = game_settings.find_one({'setting': 'global_target', 'date': today})
         if override:
             global_target = override['country']
 
-    # 2. If no admin override exists, use the standard daily math
     if not global_target:
         global_target = game_engine.get_daily_country()
 
-    # 3. If it's a new day OR the admin changed the target mid-day, reset the player!
     if session.get('date') != today or session.get('target') != global_target:
         session['date'] = today
         session['target'] = global_target
@@ -53,8 +49,8 @@ def home():
         session['guess_count'] = 0
         session['has_won'] = False
         session['submitted_score'] = False
-        session['grid'] = []     # <-- NEW: Create a blank emoji list
-        session['time_str'] = "" # <-- NEW: Create a blank time string
+        session['grid'] = []
+        session['time_str'] = ""
 
     return render_template("index.html", 
                            has_won=session.get('has_won', False), 
@@ -95,14 +91,12 @@ def process_guess():
         session['grid'] = []
 
     if final_guess == target:
-        session['grid'].append("🟩") # NEW: Add a green square!
-        # 1. Calculate the raw time
+        session['grid'].append("🟩")
+
         raw_time = time.time() - session['start_time']
         
-        # 2. Calculate the penalty (3 seconds per guess)
         penalty_seconds = (session['guess_count']-1) * 3
         
-        # 3. Add them together for the final score!
         total_time = raw_time + penalty_seconds
         
         session['final_time'] = total_time 
@@ -111,16 +105,16 @@ def process_guess():
         mins, secs = int(total_time // 60), total_time % 60
         time_str = f"{mins}m {secs:.1f}s" if mins > 0 else f"{secs:.1f}s"
         
-        session['time_str'] = time_str # NEW: Save the final time string!
+        session['time_str'] = time_str
 
         return jsonify({
             "status": "win", 
             "message": f"🎉 You Won! {final_guess} is correct! Took {session['guess_count']} guesses in {time_str} (includes +{penalty_seconds}s penalty).",
-            "grid": "".join(session['grid']), # NEW: Send the grid to the browser
-            "time_str": time_str              # NEW: Send the time to the browser
+            "grid": "".join(session['grid']),
+            "time_str": time_str
         })
     else:
-        session['grid'].append("🟥") # NEW: Add a red square for a wrong guess!
+        session['grid'].append("🟥")
         dist, bearing = game_engine.country_dist(target, final_guess)
         return jsonify({
             "status": "continue", 
@@ -130,7 +124,7 @@ def process_guess():
 
 @app.route("/save_score", methods=["POST"])
 def save_score():
-    # --- ANTI-CHEAT: Stop them from submitting multiple names ---
+
     if session.get('submitted_score'):
         return jsonify({"status": "error", "message": "Score already submitted today!"})
 
@@ -138,19 +132,19 @@ def save_score():
         name = request.form.get("name").strip()[:20]
         guesses = session.get('guess_count')
         
-        # --- Use the frozen time from when they won ---
+
         elapsed = session.get('final_time', time.time() - session.get('start_time'))
         today = str(datetime.datetime.now(datetime.timezone.utc).date())
         
         if leaderboard is not None:
-            # PyMongo uses 'insert_one' to save a dictionary
+
             leaderboard.insert_one({
                 'name': name,
                 'guesses': guesses,
                 'time': round(elapsed, 2),
                 'date': today
             })
-            # --- ANTI-CHEAT: Lock the submission form ---
+   
             session['submitted_score'] = True 
             
         return jsonify({"status": "success"})
@@ -164,14 +158,11 @@ def get_leaderboard():
     today = str(datetime.datetime.now(datetime.timezone.utc).date())
     
     if leaderboard is not None:
-        # Ask MongoDB to find today's scores, sort them by least guesses (1) 
-        # then by fastest time (1), and only give us the top 10
+
         scores_cursor = leaderboard.find({'date': today}).sort([('time', 1), ('guesses', 1)]).limit(10)
         
-        # Convert the cursor to a standard Python list
         scores = list(scores_cursor)
         
-        # PyMongo adds a special '_id' to everything, which breaks JSON, so we convert it to a string
         for s in scores:
             s['_id'] = str(s['_id'])
     else:
@@ -181,26 +172,22 @@ def get_leaderboard():
 
 @app.route("/dev-reset")
 def dev_reset():
-    # This wipes your session cookies and redirects you back to the home page!
+
     session.clear()
     return redirect(url_for('home'))
 
 @app.route("/admin-clear-board")
 def admin_clear_board():
-    # 1. A basic security check! 
-    # The URL must end with ?key=your_secret_password
+
     secret_key = request.args.get("key")
-    if secret_key != "leaderboardreset1!": # Change this to whatever password you want!
+    if secret_key != "leaderboardreset1!":
         return "Unauthorized", 401
 
-    # 2. Get today's date
     today = str(datetime.datetime.now(datetime.timezone.utc).date())
     
     if leaderboard is not None:
-        # 3. Ask PyMongo to delete all entries matching today's date
         result = leaderboard.delete_many({'date': today})
         
-        # 4. Print a success message showing how many scores were wiped
         return f"""
         <h3>Success!</h3> 
         <p>Deleted {result.deleted_count} scores for {today}.</p>
@@ -211,7 +198,7 @@ def admin_clear_board():
     
 @app.route("/admin-random-target")
 def admin_random_target():
-    # 1. Security Check
+
     secret_key = request.args.get("key")
     if secret_key != "resetcountry1!": 
         return "Unauthorized", 401
@@ -220,15 +207,13 @@ def admin_random_target():
     today = str(datetime.datetime.now(datetime.timezone.utc).date())
 
     if game_settings is not None:
-        # 2. Save this new target to MongoDB so ALL players see it
-        # (upsert=True means "update it if it exists, create it if it doesn't")
+
         game_settings.update_one(
             {'setting': 'global_target'},
             {'$set': {'country': random_country, 'date': today}},
             upsert=True
         )
-        
-        # 3. Wipe today's leaderboard so scores don't mix!
+
         if leaderboard is not None:
             leaderboard.delete_many({'date': today})
 
