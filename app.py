@@ -250,7 +250,8 @@ def process_practice_guess():
 
         return jsonify({
             "status": "win", 
-            "message": f"🎉 You Won! {final_guess} is correct! Took {session['p_guess_count']} guesses.",
+            # FIX: We added the time_str and penalty_seconds to this message!
+            "message": f"🎉 You Won! {final_guess} is correct! Took {session['p_guess_count']} guesses in {time_str} (includes +{penalty_seconds}s penalty).",
             "grid": "".join(session['p_grid']), 
             "time_str": time_str              
         })
