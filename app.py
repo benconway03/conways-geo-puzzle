@@ -53,12 +53,14 @@ def home():
         session['time_str'] = ""
 
     return render_template("index.html", 
+                           is_practice=False, 
                            has_won=session.get('has_won', False), 
                            submitted=session.get('submitted_score', False),
                            guesses=session.get('guess_count', 0),
                            share_grid="".join(session.get('grid', [])), 
                            time_str=session.get('time_str', ""),
-                           countries=valid_countries)
+                           countries=valid_countries,
+                           target_country=session.get('target', ""))
 
 
 @app.route("/guess", methods=["POST"])
@@ -110,8 +112,9 @@ def process_guess():
         return jsonify({
             "status": "win", 
             "message": f"🎉 You Won! {final_guess} is correct! Took {session['guess_count']} guesses in {time_str} (includes +{penalty_seconds}s penalty).",
-            "grid": "".join(session['grid']),
-            "time_str": time_str
+            "grid": "".join(session['grid']), 
+            "time_str": time_str,
+            "country": final_guess  # <-- NEW: Send the name to JS!
         })
     else:
         session['grid'].append("🟥")
@@ -191,7 +194,8 @@ def practice():
                            guesses=session.get('p_guess_count', 0),
                            share_grid="".join(session.get('p_grid', [])), 
                            time_str=session.get('p_time_str', ""),
-                           countries=valid_countries)
+                           countries=valid_countries,
+                           target_country=session.get('p_target', ""))
 
 @app.route("/reset_practice")
 def reset_practice():
@@ -250,10 +254,10 @@ def process_practice_guess():
 
         return jsonify({
             "status": "win", 
-            # FIX: We added the time_str and penalty_seconds to this message!
-            "message": f"🎉 You Won! {final_guess} is correct! Took {session['p_guess_count']} guesses in {time_str} (includes +{penalty_seconds}s penalty).",
-            "grid": "".join(session['p_grid']), 
-            "time_str": time_str              
+            "message": f"🎉 You Won! {final_guess} is correct! Took {session['guess_count']} guesses in {time_str} (includes +{penalty_seconds}s penalty).",
+            "grid": "".join(session['grid']), 
+            "time_str": time_str,
+            "country": final_guess  # <-- NEW: Send the name to JS!
         })
     else:
         session['p_grid'].append("🟥") 

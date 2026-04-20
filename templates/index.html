@@ -60,7 +60,8 @@
         let hasSubmitted = {{ 'true' if submitted else 'false' }};
         let currentGuesses = {{ guesses }}; 
         let shareGrid = "{{ share_grid }}"; 
-        let shareTime = "{{ time_str }}";   
+        let shareTime = "{{ time_str }}"; 
+        let winningCountry = "{{ target_country }}";  // <-- NEW
 
         if (hasWon && !hasSubmitted && !isPractice) {
             document.getElementById("guessForm").style.display = "none";
@@ -93,7 +94,8 @@
             if (data.status === "win") {
                 hasWon = true;
                 shareGrid = data.grid;      
-                shareTime = data.time_str;  
+                shareTime = data.time_str;
+                winningCountry = data.country;  
                 document.getElementById("guessForm").style.display = "none";
                 
                 // If practice, skip the leaderboard name-entry and go straight to final screen
@@ -119,10 +121,10 @@
         function showFinalScreen() {
             let containerHTML = `
                 <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #166534;">
-                    <h3 style="margin: 0;">🎉 You found the country in ${currentGuesses} guesses!</h3>
+                    
+                    <h3 style="margin: 0;">🎉 You found <strong>${winningCountry}</strong> in ${currentGuesses} guesses!</h3>
                     
                     <p style="margin: 5px 0 0 0; font-size: 1.1em; font-weight: bold; color: #15803d;">⏱️ Total Time: ${shareTime}</p>
-                    
                     <p style="margin: 5px 0 15px 0; font-size: 0.9em;">
                         ${isPractice ? "Great job practicing!" : "Come back tomorrow for a new puzzle."}
                     </p>
