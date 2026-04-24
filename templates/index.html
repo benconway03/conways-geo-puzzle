@@ -33,15 +33,14 @@
         {% endif %}
 
         <form id="guessForm" data-mode="{{ 'practice' if is_practice else 'daily' }}">
-            <input type="text" id="guessInput" name="guess" placeholder="Enter a country..." autocomplete="off" list="country-list" required>
-            <button type="submit">Guess</button>
+            <div style="position: relative; max-width: 300px; margin: 0 auto;">
+                <input type="text" id="guessInput" name="guess" placeholder="Enter a country..." autocomplete="off" required>
+                
+                <div id="suggestionsBox" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-radius: 0 0 5px 5px; max-height: 200px; overflow-y: auto; display: none; z-index: 1000; text-align: left; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+            </div>
+            
+            <button type="submit" style="margin-top: 10px;">Guess</button>
         </form>
-
-        <datalist id="country-list">
-            {% for country in countries %}
-                <option value="{{ country }}"></option>
-            {% endfor %}
-        </datalist>
 
         <div id="results">
             {% if has_won and not submitted and not is_practice %}
@@ -61,7 +60,61 @@
         let currentGuesses = {{ guesses }}; 
         let shareGrid = "{{ share_grid }}"; 
         let shareTime = "{{ time_str }}"; 
-        let winningCountry = "{{ target_country }}";  // <-- NEW
+        let winningCountry = "{{ target_country }}";
+        let allCountries = {{ countries | tojson }};
+        let inputEl = document.getElementById("guessInput");
+        let suggBox = document.getElementById("suggestionsBox");
+
+        // Listen for every keystroke
+        inputEl.addEventListener("input", function() {
+            let val = this.value.toLowerCase();
+            suggBox.innerHTML = ""; // Clear old suggestions
+            
+            if (!val) {
+                suggBox.style.display = "none";
+                return;
+            }
+
+            // Find all countries that include what they typed
+            let matches = allCountries.filter(c => c.toLowerCase().includes(val));
+
+            if (matches.length > 0) {
+                suggBox.style.display = "block";
+                
+                // Create a clickable row for each match (up to 10 max so it doesn't get huge)
+                matches.slice(0, 10).forEach(match => {
+                    let div = document.createElement("div");
+                    div.innerText = match;
+                    div.style.padding = "10px";
+                    div.style.cursor = "pointer";
+                    div.style.borderBottom = "1px solid #eee";
+                    div.style.color = "black";
+                    div.style.backgroundColor = "white";
+
+                    // Highlight gray when hovering (desktop) or tapping (mobile)
+                    div.onmouseover = () => div.style.backgroundColor = "#f3f4f6";
+                    div.onmouseout = () => div.style.backgroundColor = "white";
+
+                    // When they click a suggestion, fill the box and hide the list!
+                    div.addEventListener("click", function() {
+                        inputEl.value = match;
+                        suggBox.style.display = "none";
+                        inputEl.focus(); // Keep the keyboard open
+                    });
+                    
+                    suggBox.appendChild(div);
+                });
+            } else {
+                suggBox.style.display = "none";
+            }
+        });
+
+        // Hide the dropdown if they click anywhere else on the screen
+        document.addEventListener("click", function(e) {
+            if (e.target.id !== "guessInput") {
+                suggBox.style.display = "none";
+            }
+        });
 
         if (hasWon && !hasSubmitted && !isPractice) {
             document.getElementById("guessForm").style.display = "none";
