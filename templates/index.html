@@ -39,7 +39,15 @@
                 <div id="suggestionsBox" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; border-radius: 0 0 5px 5px; max-height: 200px; overflow-y: auto; display: none; z-index: 1000; text-align: left; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
             </div>
             
-            <button type="submit" style="margin-top: 10px;">Guess</button>
+            {% if is_practice %}
+            <div style="margin-top: 12px;">
+                <label style="cursor: pointer; font-size: 0.9em; font-weight: bold; color: #dc2626;">
+                    <input type="checkbox" id="hardmodeToggle" style="cursor: pointer;"> 🔥 Hard Mode (Hide Direction)
+                </label>
+            </div>
+            {% endif %}
+
+            <button type="submit" style="margin-top: 12px;">Guess</button>
         </form>
 
         <div id="results">
@@ -132,7 +140,12 @@
             currentGuesses++;
 
             let formData = new FormData(this);
-            // Decide which URL to fetch based on the mode!
+            
+            let hardToggle = document.getElementById("hardmodeToggle");
+            if (hardToggle && hardToggle.checked) {
+                formData.append("hardmode", "true");
+            }
+
             let endpoint = this.dataset.mode === 'practice' ? "/guess_practice" : "/guess";
             let response = await fetch(endpoint, { method: "POST", body: formData });
             let data = await response.json();

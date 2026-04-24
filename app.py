@@ -258,6 +258,7 @@ def process_practice_guess():
         session['p_start_time'] = time.time()
 
     user_guess = request.form.get("guess").strip().title()
+    is_hardmode = request.form.get("hardmode") == "true"
     target = session.get('p_target')
     
     aliases = {"Russia": "Russian Federation", "Usa": "United States", "Uk": "United Kingdom"}
@@ -305,9 +306,16 @@ def process_practice_guess():
         session.modified = True  
         
         dist, bearing = game_engine.country_dist(target, final_guess)
+        
+        # --- NEW: Check the flag to decide which message to send! ---
+        if is_hardmode:
+            hint_msg = f"❌ {final_guess} is {dist} away."
+        else:
+            hint_msg = f"❌ {final_guess} is {dist} away. Head {bearing}"
+            
         return jsonify({
             "status": "continue", 
-            "message": f"❌ {final_guess} is {dist} away. Head {bearing}"
+            "message": hint_msg
         })
 
 @app.route("/dev-reset")
