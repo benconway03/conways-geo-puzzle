@@ -8,6 +8,7 @@ import os
 from pymongo import MongoClient
 import certifi
 import random
+from zoneinfo import ZoneInfo
 
 MONGO_URI = os.environ.get("MONGO_URI")
 
@@ -31,17 +32,57 @@ valid_countries = game_engine.df_countries['COUNTRY'].tolist()
 @app.route("/")
 def home():
     session.permanent = True 
-    today = str(datetime.datetime.now(datetime.timezone.utc).date())
+    today = str(datetime.datetime.now(ZoneInfo("Europe/London")).date())
 
     global_target = None
+    
     if game_settings is not None:
-        override = game_settings.find_one({'setting': 'global_target', 'date': today})
-        if override:
-            global_target = override['country']
+        # 1. Ask MongoDB if a target is already set for today
+        target_doc = game_settings.find_one({'setting': 'daily_target', 'date': today})
+        
+        if target_doc:
+            global_target = target_doc['country']
+        else:
+            # 2. MIDNIGHT RESET! Time to pick a new country and update history.
+            
+            # Pull the history list from the DB (or create a blank one if it's our first day)
+            history_doc = game_settings.find_one({'setting': 'history'})
+            recent_50 = history_doc['used'] if history_doc else []
+            
+            # Filter out the recent 50 from our list of valid options
+            available_countries = [c for c in valid_countries if c not in recent_50]
+            
+            # Fallback just in case we somehow run out of countries
+            if not available_countries:
+                available_countries = valid_countries
+                
+            # Pick the new target from the safe, remaining countries
+            global_target = random.choice(available_countries)
+            
+            # Add it to the history list
+            recent_50.append(global_target)
+            
+            # If the list is larger than 50, chop off the oldest one!
+            if len(recent_50) > 50:
+                recent_50 = recent_50[-50:] 
+                
+            # Save the new daily target AND the updated history list back to MongoDB
+            game_settings.update_one(
+                {'setting': 'daily_target'}, 
+                {'$set': {'country': global_target, 'date': today}}, 
+                upsert=True
+            )
+            game_settings.update_one(
+                {'setting': 'history'}, 
+                {'$set': {'used': recent_50}}, 
+                upsert=True
+            )
 
+    # 3. If MongoDB is completely offline, fallback to your old geogame.py engine
     if not global_target:
         global_target = game_engine.get_daily_country()
 
+    # 4. If it's a new day for the player, reset their session variables
     if session.get('date') != today or session.get('target') != global_target:
         session['date'] = today
         session['target'] = global_target
@@ -49,8 +90,8 @@ def home():
         session['guess_count'] = 0
         session['has_won'] = False
         session['submitted_score'] = False
-        session['grid'] = []
-        session['time_str'] = ""
+        session['grid'] = []     
+        session['time_str'] = "" 
 
     return render_template("index.html", 
                            is_practice=False, 
