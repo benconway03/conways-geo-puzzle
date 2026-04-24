@@ -261,7 +261,7 @@ def process_practice_guess():
     is_hardmode = request.form.get("hardmode") == "true"
     target = session.get('p_target')
     
-    aliases = {"Russia": "Russian Federation", "Usa": "United States", "Uk": "United Kingdom"}
+    aliases = {"Usa": "United States", "Uk": "United Kingdom"}
     if user_guess in aliases:
         user_guess = aliases[user_guess]
 
