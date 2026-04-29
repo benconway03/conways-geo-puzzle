@@ -70,6 +70,7 @@
         let shareTime = "{{ time_str }}"; 
         let winningCountry = "{{ target_country }}";
         let allCountries = {{ countries | tojson }};
+        let todayDate = "{{ server_date }}";
         let inputEl = document.getElementById("guessInput");
         let suggBox = document.getElementById("suggestionsBox");
 
@@ -184,15 +185,75 @@
             ` + resultsDiv.innerHTML;
         }
 
+        // --- NEW: STREAK TRACKER ---
+        function updateAndGetStreak() {
+            let lastWinDate = localStorage.getItem("lastWinDate");
+            let currentStreak = parseInt(localStorage.getItem("currentStreak") || "0");
+            let maxStreak = parseInt(localStorage.getItem("maxStreak") || "0");
+
+            // If they already won today, just return the current stats without changing them
+            if (lastWinDate === todayDate) {
+                return { current: currentStreak, max: maxStreak };
+            }
+
+            if (lastWinDate) {
+                // Safely calculate exactly one day before the official server date
+                let [y, m, d] = todayDate.split('-').map(Number);
+                let todayObj = new Date(y, m - 1, d);
+                todayObj.setDate(todayObj.getDate() - 1);
+                
+                let yy = todayObj.getFullYear();
+                let mm = String(todayObj.getMonth() + 1).padStart(2, '0');
+                let dd = String(todayObj.getDate()).padStart(2, '0');
+                let yesterdayStr = `${yy}-${mm}-${dd}`;
+
+                // If their last win was yesterday, increment! Otherwise, reset to 1.
+                if (lastWinDate === yesterdayStr) {
+                    currentStreak++;
+                } else {
+                    currentStreak = 1;
+                }
+            } else {
+                // First time ever winning!
+                currentStreak = 1;
+            }
+
+            if (currentStreak > maxStreak) {
+                maxStreak = currentStreak;
+            }
+
+            // Save the new stats back to the browser's memory
+            localStorage.setItem("lastWinDate", todayDate);
+            localStorage.setItem("currentStreak", currentStreak);
+            localStorage.setItem("maxStreak", maxStreak);
+
+            return { current: currentStreak, max: maxStreak };
+        }
+        // ---------------------------
+
         function showFinalScreen() {
+            // NEW: Get the streak stats (Default to 0 for Practice Mode)
+            let stats = { current: 0, max: 0 };
+            if (!isPractice) {
+                stats = updateAndGetStreak();
+            }
+
             let containerHTML = `
                 <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #166534;">
                     
                     <h3 style="margin: 0;">🎉 You found <strong>${winningCountry}</strong> in ${currentGuesses} guesses!</h3>
                     
                     <p style="margin: 5px 0 0 0; font-size: 1.1em; font-weight: bold; color: #15803d;">⏱️ Total Time: ${shareTime}</p>
+                    
+                    ${!isPractice ? `
+                    <div style="margin: 10px 0; padding: 8px; background-color: #dcfce7; border-radius: 5px; display: inline-block;">
+                        <span style="font-weight: bold;">🔥 Streak: ${stats.current}</span> 
+                        <span style="color: #166534; font-size: 0.9em; margin-left: 10px;">(Max: ${stats.max})</span>
+                    </div>
+                    ` : ""}
+                    
                     <p style="margin: 5px 0 15px 0; font-size: 0.9em;">
-                        ${isPractice ? "Great job practicing!" : "Come back tomorrow for a new puzzle."}
+                        ${isPractice ? "Great job practicing!" : "Come back tomorrow for a new puzzle to keep your streak alive."}
                     </p>
             `;
 

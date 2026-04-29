@@ -101,7 +101,8 @@ def home():
                            share_grid="".join(session.get('grid', [])), 
                            time_str=session.get('time_str', ""),
                            countries=valid_countries,
-                           target_country=session.get('target', ""))
+                           target_country=session.get('target', ""),
+                           server_date=today)
 
 
 @app.route("/guess", methods=["POST"])
