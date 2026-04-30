@@ -185,6 +185,16 @@
             ` + resultsDiv.innerHTML;
         }
 
+        function getStreakEmoji(streak) {
+            if (streak >= 50) return "👑"; // 50+: Legend tier
+            if (streak >= 20) return "💎"; // 20+: Diamond tier
+            if (streak >= 10) return "⚡";  // 10+: Unstoppable
+            if (streak >= 5)  return "☄️";  // 5+: On a roll
+            if (streak >= 3)  return "🔥";  // 3+: Heating up
+            if (streak >= 1)  return "🕯️";  // 1+: The spark is lit
+            return "";
+        }
+
         // --- NEW: STREAK TRACKER ---
         function updateAndGetStreak() {
             let lastWinDate = localStorage.getItem("lastWinDate");
@@ -247,7 +257,7 @@
                     
                     ${!isPractice ? `
                     <div style="margin: 10px 0; padding: 8px; background-color: #dcfce7; border-radius: 5px; display: inline-block;">
-                        <span style="font-weight: bold;">🔥 Streak: ${stats.current}</span> 
+                        <span style="font-weight: bold;">${getStreakEmoji(stats.current)} Streak: ${stats.current}</span> 
                         <span style="color: #166534; font-size: 0.9em; margin-left: 10px;">(Max: ${stats.max})</span>
                     </div>
                     ` : ""}
@@ -343,7 +353,7 @@
                 
                 let html = "<h3 style='margin-top:0;'>Leaderboard</h3><table style='width:100%; text-align:left;'><tr><th>Name</th><th>Guesses</th><th>Time</th></tr>";
                 scores.forEach(s => {
-                    let streakHtml = s.streak > 0 ? ` <span style="font-size: 0.8em; color: #ea580c;">🔥${s.streak}</span>` : "";
+                    let streakHtml = s.streak > 0 ? ` <span style="font-size: 0.8em; color: #ea580c;">${getStreakEmoji(s.streak)}${s.streak}</span>` : "";
                     html += `<tr><td>${escapeHTML(s.name)}${streakHtml}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
                 });
                 html += "</table>";
@@ -383,7 +393,7 @@
 
                 let html = "<h3 style='margin-top:0; font-size: 1.1em;'>Leaderboard</h3><table style='width:100%; text-align:left; font-size: 0.9em;'><tr><th>Name</th><th>Guesses</th><th>Time</th></tr>";
                 scores.forEach(s => {
-                    let streakHtml = s.streak > 0 ? ` <span style="font-size: 0.8em; color: #ea580c;">🔥${s.streak}</span>` : "";
+                    let streakHtml = s.streak > 0 ? ` <span style="font-size: 0.8em; color: #ea580c;">${getStreakEmoji(s.streak)}${s.streak}</span>` : "";
                     html += `<tr><td>${escapeHTML(s.name)}${streakHtml}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
                 });
                 html += "</table>";
