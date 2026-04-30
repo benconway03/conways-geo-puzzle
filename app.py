@@ -44,8 +44,6 @@ def home():
             global_target = target_doc['country']
         else:
             # 2. MIDNIGHT RESET! Time to pick a new country and update history.
-            
-            # Pull the history list from the DB (or create a blank one if it's our first day)
             history_doc = game_settings.find_one({'setting': 'history'})
             recent_50 = history_doc['used'] if history_doc else []
             
@@ -156,7 +154,7 @@ def process_guess():
             "message": f"🎉 You Won! {final_guess} is correct! Took {session['guess_count']} guesses in {time_str} (includes +{penalty_seconds}s penalty).",
             "grid": "".join(session['grid']), 
             "time_str": time_str,
-            "country": final_guess  # <-- NEW: Send the name to JS!
+            "country": final_guess
         })
     else:
         session['grid'].append("🟥")
@@ -169,27 +167,47 @@ def process_guess():
 
 @app.route("/save_score", methods=["POST"])
 def save_score():
-
     if session.get('submitted_score'):
         return jsonify({"status": "error", "message": "Score already submitted today!"})
+        
+    if not session.get('has_won'):
+        return jsonify({"status": "error", "message": "No active win found."}), 400
 
     try:
-        name = request.form.get("name").strip()[:20]
-        guesses = session.get('guess_count')
-        
+        # --- NEW: Name and Anti-Cheat Flag ---
+        raw_name = request.form.get("name", "Anonymous").strip()
+        is_sus = request.form.get("sus") == "true"
+        final_name = f"{raw_name[:15]} 🕵️‍♂️" if is_sus else raw_name[:20]
+        # -------------------------------------
 
+        guesses = session.get('guess_count')
         elapsed = session.get('final_time', time.time() - session.get('start_time'))
-        today = str(datetime.datetime.now(datetime.timezone.utc).date())
+        today = str(datetime.datetime.now(ZoneInfo("Europe/London")).date())
+        
+        # --- NEW: Grab their real IP address ---
+        user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if user_ip:
+            user_ip = user_ip.split(',')[0].strip()
+        # ---------------------------------------
+        
+        # --- NEW: Safely grab the streak ---
+        raw_streak = request.form.get("streak", 1)
+        try:
+            user_streak = int(raw_streak)
+        except ValueError:
+            user_streak = 1
+        # -----------------------------------
         
         if leaderboard is not None:
-
-            leaderboard.insert_one({
-                'name': name,
+            score_doc = {
+                'name': final_name,
                 'guesses': guesses,
                 'time': round(elapsed, 2),
-                'date': today
-            })
-   
+                'date': today,
+                'ip_address': user_ip,
+                'streak': user_streak
+            }
+            leaderboard.insert_one(score_doc)
             session['submitted_score'] = True 
             
         return jsonify({"status": "success"})
@@ -200,20 +218,21 @@ def save_score():
     
 @app.route("/get_leaderboard")
 def get_leaderboard():
-    today = str(datetime.datetime.now(datetime.timezone.utc).date())
+    today = str(datetime.datetime.now(ZoneInfo("Europe/London")).date())
     
+    formatted_scores = []
     if leaderboard is not None:
-
         scores_cursor = leaderboard.find({'date': today}).sort([('time', 1), ('guesses', 1)]).limit(10)
         
-        scores = list(scores_cursor)
-        
-        for s in scores:
-            s['_id'] = str(s['_id'])
-    else:
-        scores = []
-        
-    return jsonify(scores)
+        for s in scores_cursor:
+            formatted_scores.append({
+                "name": s["name"],
+                "guesses": s["guesses"],
+                "time": s["time"],
+                "streak": s.get("streak", 0)  # Pass the streak to JS!
+            })
+            
+    return jsonify(formatted_scores)
 
 # --- PRACTICE MODE ROUTES ---
 
@@ -228,7 +247,6 @@ def practice():
         session['p_grid'] = []
         session['p_time_str'] = ""
 
-    # FIX: We changed submitted=True to submitted=False here!
     return render_template("index.html", 
                            is_practice=True, 
                            has_won=session.get('p_has_won', False), 
@@ -297,10 +315,10 @@ def process_practice_guess():
 
         return jsonify({
             "status": "win", 
-            "message": f"🎉 You Won! {final_guess} is correct! Took {session['guess_count']} guesses in {time_str} (includes +{penalty_seconds}s penalty).",
-            "grid": "".join(session['grid']), 
+            "message": f"🎉 You Won! {final_guess} is correct! Took {session['p_guess_count']} guesses in {time_str} (includes +{penalty_seconds}s penalty).",
+            "grid": "".join(session['p_grid']), 
             "time_str": time_str,
-            "country": final_guess  # <-- NEW: Send the name to JS!
+            "country": final_guess
         })
     else:
         session['p_grid'].append("🟥") 
@@ -308,7 +326,6 @@ def process_practice_guess():
         
         dist, bearing = game_engine.country_dist(target, final_guess)
         
-        # --- NEW: Check the flag to decide which message to send! ---
         if is_hardmode:
             hint_msg = f"❌ {final_guess} is {dist} away."
         else:
@@ -321,18 +338,16 @@ def process_practice_guess():
 
 @app.route("/dev-reset")
 def dev_reset():
-
     session.clear()
     return redirect(url_for('home'))
 
 @app.route("/admin-clear-board")
 def admin_clear_board():
-
     secret_key = request.args.get("key")
     if secret_key != "leaderboardreset1!":
         return "Unauthorized", 401
 
-    today = str(datetime.datetime.now(datetime.timezone.utc).date())
+    today = str(datetime.datetime.now(ZoneInfo("Europe/London")).date())
     
     if leaderboard is not None:
         result = leaderboard.delete_many({'date': today})
@@ -347,16 +362,14 @@ def admin_clear_board():
     
 @app.route("/admin-random-target")
 def admin_random_target():
-
     secret_key = request.args.get("key")
     if secret_key != "resetcountry1!": 
         return "Unauthorized", 401
 
     random_country = random.choice(valid_countries)
-    today = str(datetime.datetime.now(datetime.timezone.utc).date())
+    today = str(datetime.datetime.now(ZoneInfo("Europe/London")).date())
 
     if game_settings is not None:
-
         game_settings.update_one(
             {'setting': 'global_target'},
             {'$set': {'country': random_country, 'date': today}},

@@ -304,6 +304,9 @@
             let formData = new FormData();
             formData.append("name", name);
 
+            let currentStreak = localStorage.getItem("currentStreak") || "1";
+            formData.append("streak", currentStreak);
+
             let btn = document.querySelector("#leaderboard-entry button");
             btn.innerText = "Saving...";
             btn.disabled = true;
@@ -338,7 +341,9 @@
                 
                 let html = "<h3 style='margin-top:0;'>Today's Top 10</h3><table style='width:100%; text-align:left;'><tr><th>Name</th><th>Guesses</th><th>Time</th></tr>";
                 scores.forEach(s => {
-                    html += `<tr><td>${escapeHTML(s.name)}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
+                    // --- NEW: Inject the streak emoji if they have a streak > 0 ---
+                    let streakHtml = s.streak > 0 ? ` <span style="font-size: 0.8em; color: #ea580c;">🔥${s.streak}</span>` : "";
+                    html += `<tr><td>${escapeHTML(s.name)}${streakHtml}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
                 });
                 html += "</table>";
                 
@@ -370,7 +375,9 @@
 
                     let html = "<h3 style='margin-top:0; font-size: 1.1em;'>Today's Top 10</h3><table style='width:100%; text-align:left; font-size: 0.9em;'><tr><th>Name</th><th>Guesses</th><th>Time</th></tr>";
                     scores.forEach(s => {
-                        html += `<tr><td>${escapeHTML(s.name)}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
+                        // --- NEW: Inject the streak emoji if they have a streak > 0 ---
+                        let streakHtml = s.streak > 0 ? ` <span style="font-size: 0.8em; color: #ea580c;">🔥${s.streak}</span>` : "";
+                        html += `<tr><td>${escapeHTML(s.name)}${streakHtml}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
                     });
                     html += "</table>";
                     
