@@ -334,24 +334,73 @@
             return div.innerHTML;
         }
 
-        async function loadLeaderboard() {
+         async function loadLeaderboard(showAll = false) {
             try {
-                let response = await fetch("/get_leaderboard");
+                // If showAll is true, append the special query parameter
+                let url = showAll ? "/get_leaderboard?all=true" : "/get_leaderboard";
+                let response = await fetch(url);
                 let scores = await response.json();
                 
-                let html = "<h3 style='margin-top:0;'>Today's Top 10</h3><table style='width:100%; text-align:left;'><tr><th>Name</th><th>Guesses</th><th>Time</th></tr>";
+                let html = "<h3 style='margin-top:0;'>Leaderboard</h3><table style='width:100%; text-align:left;'><tr><th>Name</th><th>Guesses</th><th>Time</th></tr>";
                 scores.forEach(s => {
-                    // --- NEW: Inject the streak emoji if they have a streak > 0 ---
                     let streakHtml = s.streak > 0 ? ` <span style="font-size: 0.8em; color: #ea580c;">🔥${s.streak}</span>` : "";
                     html += `<tr><td>${escapeHTML(s.name)}${streakHtml}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
                 });
                 html += "</table>";
+                
+                // --- NEW: Inject the 'See More' button if there are at least 10 scores ---
+                if (!showAll && scores.length === 10) {
+                    html += `
+                    <div style="text-align: center;">
+                        <button onclick="loadLeaderboard(true)" style="background-color: #e2e8f0; color: black; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; margin-top: 10px; font-weight: bold;">
+                            👇 See More
+                        </button>
+                    </div>`;
+                }
                 
                 let targetDiv = document.getElementById("leaderboard-table") || document.getElementById("results");
                 targetDiv.innerHTML = html;
             } catch(err) {
                 let targetDiv = document.getElementById("leaderboard-table") || document.getElementById("results");
                 targetDiv.innerHTML = "<p style='color:red;'>⚠️ Error loading leaderboard.</p>";
+            }
+        }
+
+        // --- NEW HELPER FUNCTION: Fetches the live board with optional 'showAll' ---
+        async function fetchLiveBoard(showAll = false) {
+            let container = document.getElementById("live-board-container");
+            container.innerHTML = "<p style='text-align:center; color:gray;'>Loading...</p>";
+
+            try {
+                let url = showAll ? "/get_leaderboard?all=true" : "/get_leaderboard";
+                let response = await fetch(url);
+                let scores = await response.json();
+                
+                if (scores.length === 0) {
+                    container.innerHTML = "<p style='text-align:center;'>No scores yet today! Be the first!</p>";
+                    return;
+                }
+
+                let html = "<h3 style='margin-top:0; font-size: 1.1em;'>Leaderboard</h3><table style='width:100%; text-align:left; font-size: 0.9em;'><tr><th>Name</th><th>Guesses</th><th>Time</th></tr>";
+                scores.forEach(s => {
+                    let streakHtml = s.streak > 0 ? ` <span style="font-size: 0.8em; color: #ea580c;">🔥${s.streak}</span>` : "";
+                    html += `<tr><td>${escapeHTML(s.name)}${streakHtml}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
+                });
+                html += "</table>";
+                
+                // Inject the 'See More' button here as well
+                if (!showAll && scores.length === 10) {
+                    html += `
+                    <div style="text-align: center;">
+                        <button onclick="fetchLiveBoard(true)" style="background-color: #e2e8f0; color: black; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; margin-top: 10px; font-weight: bold;">
+                            👇 See More
+                        </button>
+                    </div>`;
+                }
+
+                container.innerHTML = html;
+            } catch(err) {
+                container.innerHTML = "<p style='color:red;'>⚠️ Error loading leaderboard.</p>";
             }
         }
 
@@ -362,29 +411,7 @@
             if (container.style.display === "none") {
                 container.style.display = "block";
                 btn.innerText = "Hide Leaderboard";
-                container.innerHTML = "<p style='text-align:center; color:gray;'>Loading...</p>";
-
-                try {
-                    let response = await fetch("/get_leaderboard");
-                    let scores = await response.json();
-                    
-                    if (scores.length === 0) {
-                        container.innerHTML = "<p style='text-align:center;'>No scores yet today! Be the first!</p>";
-                        return;
-                    }
-
-                    let html = "<h3 style='margin-top:0; font-size: 1.1em;'>Today's Top 10</h3><table style='width:100%; text-align:left; font-size: 0.9em;'><tr><th>Name</th><th>Guesses</th><th>Time</th></tr>";
-                    scores.forEach(s => {
-                        // --- NEW: Inject the streak emoji if they have a streak > 0 ---
-                        let streakHtml = s.streak > 0 ? ` <span style="font-size: 0.8em; color: #ea580c;">🔥${s.streak}</span>` : "";
-                        html += `<tr><td>${escapeHTML(s.name)}${streakHtml}</td><td>${s.guesses}</td><td>${s.time}s</td></tr>`;
-                    });
-                    html += "</table>";
-                    
-                    container.innerHTML = html;
-                } catch(err) {
-                    container.innerHTML = "<p style='color:red;'>⚠️ Error loading leaderboard.</p>";
-                }
+                fetchLiveBoard(false); // Call the new helper function
             } else {
                 container.style.display = "none";
                 btn.innerText = "🏆 View Live Leaderboard";

@@ -220,16 +220,19 @@ def save_score():
 def get_leaderboard():
     today = str(datetime.datetime.now(ZoneInfo("Europe/London")).date())
     
+    show_all = request.args.get("all") == "true"
+    limit_num = 100 if show_all else 10  # Cap it at 100 so it doesn't get infinitely long!
+    
     formatted_scores = []
     if leaderboard is not None:
-        scores_cursor = leaderboard.find({'date': today}).sort([('time', 1), ('guesses', 1)]).limit(10)
+        scores_cursor = leaderboard.find({'date': today}).sort([('time', 1), ('guesses', 1)]).limit(limit_num)
         
         for s in scores_cursor:
             formatted_scores.append({
                 "name": s["name"],
                 "guesses": s["guesses"],
                 "time": s["time"],
-                "streak": s.get("streak", 0)  # Pass the streak to JS!
+                "streak": s.get("streak", 0)
             })
             
     return jsonify(formatted_scores)
