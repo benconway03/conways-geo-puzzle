@@ -314,8 +314,8 @@
             let formData = new FormData();
             formData.append("name", name);
 
-            let currentStreak = localStorage.getItem("currentStreak") || "1";
-            formData.append("streak", currentStreak);
+            let stats = updateAndGetStreak();
+            formData.append("streak", stats.current);
 
             let btn = document.querySelector("#leaderboard-entry button");
             btn.innerText = "Saving...";
