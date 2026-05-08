@@ -74,6 +74,13 @@
         let inputEl = document.getElementById("guessInput");
         let suggBox = document.getElementById("suggestionsBox");
 
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('fix_streak')) {
+            let newStreak = urlParams.get('fix_streak');
+            localStorage.setItem('streak', newStreak); // Make sure 'streak' matches your actual key!
+            alert('Developer Magic: Streak manually set to ' + newStreak);
+        }
+
         // Listen for every keystroke
         inputEl.addEventListener("input", function() {
             let val = this.value.toLowerCase();
