@@ -374,7 +374,7 @@ def admin_random_target():
 
     if game_settings is not None:
         game_settings.update_one(
-            {'setting': 'global_target'},
+            {'setting': 'daily_target'},
             {'$set': {'country': random_country, 'date': today}},
             upsert=True
         )
